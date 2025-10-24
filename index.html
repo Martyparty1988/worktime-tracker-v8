@@ -1,0 +1,1389 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>WorkTime Tracker v8.0 (€)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #0c0d12; color: #e5e7eb; }
+        .app-container { max-width: 450px; }
+        .glow-main { box-shadow: 0 0 10px rgba(79, 70, 229, 0.3); }
+        .btn-primary { 
+            background-color: #4f46e5; color: #ffffff; font-weight: 700; 
+            transition: all 0.2s; display: flex; align-items: center; 
+            justify-content: center; gap: 0.5rem;
+        }
+        .btn-primary:hover { background-color: #4338ca; }
+        .btn-primary:active { transform: scale(0.98); }
+        .btn-secondary { 
+            background-color: #1f2937; border: 1px solid #374151; 
+            color: #d1d5db; transition: background-color 0.2s; 
+            display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+        }
+        .btn-secondary:hover { background-color: #374151; }
+        input[type="text"], input[type="number"], input[type="datetime-local"], select { 
+            background-color: #1f2937; border: 1px solid #374151; 
+            color: #e5e7eb; padding: 10px 14px; border-radius: 8px;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus { 
+            border-color: #4f46e5; outline: none; 
+            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5); 
+        }
+        input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+            background-color: #9ca3af; border-radius: 2px;
+        }
+        .large-touch-target { min-height: 48px; }
+        .progress-bar { height: 10px; background-color: #374151; border-radius: 5px; overflow: hidden; }
+        .progress-fill { background-color: #4f46e5; transition: width 0.5s ease-in-out; }
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; right: 0; max-width: 450px;
+            margin: 0 auto; background-color: #111827; border-top: 1px solid #374151;
+            display: flex; justify-content: space-around; 
+            padding-bottom: env(safe-area-inset-bottom, 0);
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.3);
+        }
+        .nav-button {
+            flex: 1; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 8px 0; color: #6b7280;
+            transition: color 0.2s; background: none; border: none; cursor: pointer;
+        }
+        .nav-button-icon { width: 24px; height: 24px; stroke-width: 2; }
+        .nav-button-label { font-size: 10px; font-weight: 600; margin-top: 2px; }
+        .nav-button.active { color: #4f46e5; }
+        .toast {
+            position: fixed; top: -100px; left: 50%; transform: translateX(-50%);
+            background-color: #2dd4bf; color: #111827; padding: 12px 20px;
+            border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            font-weight: 600; z-index: 1000; transition: top 0.4s ease-in-out;
+            max-width: 90%; text-align: center;
+        }
+        .toast.show { top: 20px; }
+        .toast.error { background-color: #f87171; color: #ffffff; }
+    </style>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WorkTime €">
+    <meta name="theme-color" content="#0c0d12">
+</head>
+<body class="flex justify-center">
+
+    <div id="loading-indicator" class="flex items-center justify-center min-h-screen w-full">
+        <div class="text-center p-4 bg-[#1f2937] rounded-xl">
+            <p class="text-lg">Načítání dat...</p>
+        </div>
+    </div>
+    
+    <div id="toast-notification" class="toast">Zpráva</div>
+
+    <main id="main-content" class="app-container w-full p-4 pb-24 hidden">
+        
+        <!-- STRÁNKA 1: STOPKY -->
+        <div id="page-timer">
+            <header class="mb-8 text-center">
+                <h1 class="text-4xl font-extrabold text-[#4f46e5] glow-main large-touch-target">WorkTime v8.0</h1>
+                <p class="text-sm text-gray-400">Sledování výkonu s kategoriemi a cíli | Měna: EUR (€)</p>
+            </header>
+
+            <section id="new-entry-form" class="bg-[#111827] p-5 rounded-2xl mb-8 shadow-2xl large-touch-target">
+                <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Nová Činnost</h2>
+                
+                <div class="flex large-touch-target mb-4 border border-gray-700 rounded-lg overflow-hidden">
+                    <button id="tab-hourly" class="flex-1 py-3 text-sm font-semibold" onclick="switchEntryType('hourly')">
+                        Hodinová Práce
+                    </button>
+                    <button id="tab-task" class="flex-1 py-3 text-sm font-semibold" onclick="switchEntryType('task')">
+                        Úkolová Práce (Stoly)
+                    </button>
+                </div>
+
+                <div class="mb-4">
+                    <label for="entry-category" class="block text-sm font-medium mb-1 text-gray-400">Kategorie / Projekt:</label>
+                    <select id="entry-category" class="w-full large-touch-target"></select>
+                </div>
+
+                <div id="form-hourly">
+                    <div class="flex justify-between items-center mb-4 p-3 bg-gray-800 rounded-lg">
+                        <span class="text-sm font-medium text-gray-400">Stav:</span>
+                        <div id="timer-status" class="flex items-center text-2xl font-mono font-bold">
+                            <span class="mr-2 text-yellow-400">STOP</span>
+                            <span id="timer-display">00:00:00</span>
+                        </div>
+                    </div>
+                    
+                    <button id="start-stop-button" class="w-full large-touch-target py-3 rounded-xl btn-primary mb-3 shadow-lg" onclick="toggleTimer()">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>ZAHÁJIT PRÁCI</span>
+                    </button>
+
+                    <p id="current-session" class="text-xs text-gray-500 text-center">Poslední relace: -</p>
+                </div>
+
+                <div id="form-task" class="hidden space-y-4">
+                    <div>
+                        <label for="task-type" class="block text-sm font-medium mb-1 text-gray-400">Typ Stolu:</label>
+                        <select id="task-type" class="w-full large-touch-target">
+                            <option value="maly">Malý stůl (30 €)</option>
+                            <option value="stredni">Střední stůl (48 €)</option>
+                            <option value="velky">Velký stůl (60 €)</option>
+                        </select>
+                    </div>
+
+                    <button class="w-full large-touch-target py-3 rounded-xl btn-primary shadow-lg" onclick="saveTaskEntry()">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        <span>ULOŽIT ÚKOL</span>
+                    </button>
+                </div>
+            </section>
+            
+            <section class="bg-[#1f2937] p-5 rounded-2xl mb-8 shadow-xl large-touch-target">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Přehled</h2>
+                    <span id="summary-date-display" class="text-sm font-semibold text-indigo-400"></span>
+                </div>
+                
+                <div class="flex justify-between items-end mb-4 border-b border-gray-700 pb-3">
+                    <span class="text-gray-400 text-sm">Výdělek (vč. běžícího):</span>
+                    <span id="total-earnings" class="text-3xl font-extrabold text-[#818cf8] font-mono">0.00 €</span>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm font-semibold">
+                        <span class="text-gray-400">Měsíční Cíl (€):</span>
+                        <span id="goal-display" class="text-indigo-400">500.00 €</span>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div id="goal-progress" class="progress-fill h-full" style="width: 0%;"></div>
+                    </div>
+                    <p id="goal-progress-text" class="text-sm text-center text-gray-400">0% hotovo</p>
+                </div>
+                
+                <div class="flex justify-between mt-4">
+                    <div class="text-center">
+                        <p class="text-gray-500 text-xs">Celkem Času (min):</p>
+                        <p id="total-time" class="font-bold text-lg text-green-400">0</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-gray-500 text-xs">Zbývá do Cíle (€):</p>
+                        <p id="remaining-goal" class="font-bold text-lg text-red-400">500.00 €</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="mb-8">
+                <h2 class="text-2xl font-bold mb-4">Záznamy</h2>
+                
+                <div class="grid grid-cols-2 gap-2 mb-4">
+                    <select id="filter-month" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()"></select>
+                    <select id="filter-year" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()"></select>
+                    <select id="filter-type" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()">
+                        <option value="all">Typ: Vše</option>
+                        <option value="hourly">Typ: Hodinová</option>
+                        <option value="task">Typ: Úkolová</option>
+                    </select>
+                    <select id="filter-category" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()">
+                        <option value="all">Projekt: Vše</option>
+                        <option value="uncategorized">Nekategorizováno</option>
+                    </select>
+                </div>
+
+                <div id="entries-list" class="space-y-3">
+                    <!-- Záznamy se načtou zde -->
+                </div>
+                
+                <p id="no-entries" class="text-center text-gray-500 mt-4 hidden">Žádné záznamy pro vybrané filtry.</p>
+                
+                <div class="flex justify-center mt-6">
+                    <button id="load-more-btn" class="btn-secondary px-4 py-2 rounded-full text-sm hidden" onclick="loadMoreEntries()">
+                        Načíst Další
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- STRÁNKA 2: STATISTIKY -->
+        <div id="page-stats" class="hidden">
+            <header class="mb-8 text-center">
+                <h1 class="text-4xl font-extrabold text-[#4f46e5] glow-main">Statistiky</h1>
+                <p class="text-sm text-gray-400">Přehled výkonu a trendů</p>
+            </header>
+
+            <section class="bg-[#111827] p-5 rounded-2xl mb-8 shadow-2xl large-touch-target">
+                <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Měsíční Přehled</h2>
+                
+                <div class="mb-4">
+                    <select id="stats-month-year" class="w-full large-touch-target" onchange="updateStats()"></select>
+                </div>
+
+                <div class="flex justify-between items-end mb-4 border-b border-gray-700 pb-3">
+                    <span class="text-gray-400 text-sm">Celkový Výdělek Měsíce:</span>
+                    <span id="stats-total-earnings" class="text-3xl font-extrabold text-[#818cf8] font-mono">0.00 €</span>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm font-semibold">
+                        <span class="text-gray-400">Cílová Progrese:</span>
+                        <span id="stats-goal-display" class="text-indigo-400">0%</span>
+                    </div>
+                    
+                    <div class="progress-bar">
+                        <div id="stats-goal-progress" class="progress-fill h-full" style="width: 0%;"></div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 mt-4 text-center">
+                    <div>
+                        <p class="text-gray-500 text-xs">Hodinová Práce (min):</p>
+                        <p id="stats-hourly-time" class="font-bold text-lg text-green-400">0</p>
+                    </div>
+                    <div>
+                        <p class="text-gray-500 text-xs">Úkolová Práce (ks):</p>
+                        <p id="stats-task-count" class="font-bold text-lg text-yellow-400">0</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-[#1f2937] p-5 rounded-2xl mb-8 shadow-xl large-touch-target">
+                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Výdělek dle Kategorie</h2>
+                <div class="relative h-64">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </section>
+
+            <section class="bg-[#1f2937] p-5 rounded-2xl mb-8 shadow-xl large-touch-target">
+                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Denní Trend</h2>
+                <div class="relative h-64">
+                    <canvas id="dailyTrendChart"></canvas>
+                </div>
+            </section>
+        </div>
+
+        <!-- STRÁNKA 3: NASTAVENÍ -->
+        <div id="page-settings" class="hidden">
+            <header class="mb-8 text-center">
+                <h1 class="text-4xl font-extrabold text-[#4f46e5] glow-main">Nastavení</h1>
+                <p class="text-sm text-gray-400">Správa účtu a aplikace</p>
+            </header>
+            
+            <section class="bg-[#111827] p-5 rounded-2xl mb-8 shadow-2xl large-touch-target">
+                <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Uživatelský Účet</h2>
+                
+                <div class="mb-4">
+                    <p class="text-sm font-medium mb-1 text-gray-400">ID Uživatele:</p>
+                    <p id="user-display" class="font-mono text-sm text-indigo-400">(ID: ...)</p>
+                </div>
+                
+                <div class="mb-4">
+                    <label for="hourly-rate" class="block text-sm font-medium mb-1 text-gray-400">Hodinová Sazba (€/hod):</label>
+                    <input type="number" id="hourly-rate" class="w-full large-touch-target" placeholder="Např. 15.00" step="0.01">
+                </div>
+                
+                <div class="mb-4">
+                    <label for="monthly-goal" class="block text-sm font-medium mb-1 text-gray-400">Měsíční Cíl (€):</label>
+                    <input type="number" id="monthly-goal" class="w-full large-touch-target" placeholder="Např. 500" step="1">
+                </div>
+
+                <div class="mb-4">
+                    <label for="categories-input" class="block text-sm font-medium mb-1 text-gray-400">Kategorie (oddělené čárkou):</label>
+                    <input type="text" id="categories-input" class="w-full large-touch-target" placeholder="Projekt A, Projekt B, Osobní">
+                </div>
+
+                <button class="w-full large-touch-target py-3 rounded-xl btn-primary shadow-lg" onclick="saveSettings()">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    <span>ULOŽIT NASTAVENÍ</span>
+                </button>
+            </section>
+            
+            <section class="bg-[#1f2937] p-5 rounded-2xl mb-8 shadow-xl large-touch-target">
+                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Správa Dat</h2>
+                
+                <div class="flex flex-col space-y-3">
+                    <button class="btn-secondary px-4 py-3 rounded-xl" onclick="exportData()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        <span>Exportovat Data (JSON)</span>
+                    </button>
+                    <button class="btn-secondary px-4 py-3 rounded-xl" onclick="importData()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <span>Importovat Data (JSON)</span>
+                        <input type="file" id="import-file" accept=".json" class="hidden" onchange="handleImportFile(event)">
+                    </button>
+                    <button class="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all" onclick="confirmDeleteAllData()">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>Smazat Všechna Data</span>
+                    </button>
+                </div>
+            </section>
+            
+            <section class="bg-[#111827] p-5 rounded-2xl mb-8 shadow-2xl large-touch-target">
+                <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">O Aplikaci</h2>
+                <p class="text-sm text-gray-400">WorkTime Tracker v8.0 (€) | Vytvořil: [Jméno Autora]</p>
+                <p class="text-xs text-gray-500 mt-2">Tato aplikace používá Firebase pro ukládání dat a autentizaci.</p>
+            </section>
+        </div>
+
+    </main>
+
+    <!-- SPODNÍ NAVIGACE -->
+    <nav class="bottom-nav">
+        <button id="nav-timer" class="nav-button active" onclick="showPage('timer')">
+            <svg class="nav-button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            <span class="nav-button-label">Stopky</span>
+        </button>
+        <button id="nav-stats" class="nav-button" onclick="showPage('stats')">
+            <svg class="nav-button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"></path></svg>
+            <span class="nav-button-label">Statistiky</span>
+        </button>
+        <button id="nav-settings" class="nav-button" onclick="showPage('settings')">
+            <svg class="nav-button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <span class="nav-button-label">Nastavení</span>
+        </button>
+    </nav>
+
+    <script type="module">
+        // -------------------------------------------------------------------
+        // 1. FIREBASE KONFIGURACE A INICIALIZACE
+        // -------------------------------------------------------------------
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, query, where, orderBy, limit, startAfter, addDoc, updateDoc, onSnapshot, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+
+        // ZDE ZADEJTE SVOU FIREBASE KONFIGURACI
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_AUTH_DOMAIN",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_STORAGE_BUCKET",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        // ZDE ZADEJTE VOLITELNÝ AUTENTIZAČNÍ TOKEN (pro automatické přihlášení)
+        const initialAuthToken = null; // Např. "eyJhbGciOiJIUzI1NiI..."
+
+        // Inicializace Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Reference na kolekce
+        const settingsRef = doc(db, "settings", "global");
+        const entriesRef = collection(db, "entries");
+
+        // -------------------------------------------------------------------
+        // 2. GLOBÁLNÍ STAV A KONSTANTY
+        // -------------------------------------------------------------------
+        const DEFAULT_RATE_EUR = 15.00;
+        const DEFAULT_GOAL_EUR = 500.00;
+        const TASK_TYPES = {
+            maly: { name: "Malý stůl", earnings: 30.00 },
+            stredni: { name: "Střední stůl", earnings: 48.00 },
+            velky: { name: "Velký stůl", earnings: 60.00 }
+        };
+        const CATEGORY_DELIMITER = ',';
+        const PAGE_SIZE = 10;
+        let lastVisible = null;
+        let timerInterval = null;
+        let categoryChartInstance = null;
+        let dailyTrendChartInstance = null;
+
+        const state = {
+            currentUser: null,
+            currentPage: 'timer',
+            entryType: 'hourly',
+            timerStartTime: null,
+            entries: [],
+            settings: {
+                userRates: {},
+                monthlyGoals: {},
+                categories: {},
+                defaultCategory: 'uncategorized'
+            },
+            filters: {
+                month: new Date().getMonth() + 1,
+                year: new Date().getFullYear(),
+                type: 'all',
+                category: 'all'
+            }
+        };
+
+        // -------------------------------------------------------------------
+        // 3. FIREBASE LISTENERY A DATA
+        // -------------------------------------------------------------------
+
+        // Nastaví posluchače na globální nastavení
+        function setupSettingsListener() {
+            onSnapshot(settingsRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    state.settings.userRates = data.userRates || {};
+                    state.settings.monthlyGoals = data.monthlyGoals || {};
+                    state.settings.categories = data.categories || {};
+                    state.timerStartTime = data.timerStartTime || null;
+                    
+                    renderSettings();
+                    renderCategorySelect();
+                    startTimerDisplay();
+                    updateSummary();
+                } else {
+                    // Inicializace globálního nastavení, pokud neexistuje
+                    setDoc(settingsRef, {
+                        userRates: {},
+                        monthlyGoals: {},
+                        categories: {},
+                        timerStartTime: null
+                    });
+                }
+                document.getElementById('loading-indicator').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+            });
+        }
+        
+        // Nastaví posluchače na záznamy (entries)
+        function setupEntriesListener(month, year) {
+            const startOfMonth = new Date(year, month - 1, 1).getTime();
+            const endOfMonth = new Date(year, month, 0).getTime();
+            
+            // Základní dotaz
+            let baseQuery = query(
+                entriesRef,
+                where("user", "==", state.currentUser),
+                where("timestamp", ">=", startOfMonth),
+                where("timestamp", "<=", endOfMonth),
+                orderBy("timestamp", "desc")
+            );
+            
+            // Aplikace filtru typu
+            if (state.filters.type !== 'all') {
+                baseQuery = query(baseQuery, where("type", "==", state.filters.type));
+            }
+
+            // Aplikace filtru kategorie
+            if (state.filters.category !== 'all') {
+                 baseQuery = query(baseQuery, where("category", "==", state.filters.category));
+            }
+            
+            // Omezení na první stránku
+            baseQuery = query(baseQuery, limit(PAGE_SIZE));
+
+            onSnapshot(baseQuery, (snapshot) => {
+                state.entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                lastVisible = snapshot.docs[snapshot.docs.length - 1];
+                renderEntries(true);
+                updateSummary();
+                if (state.currentPage === 'stats') {
+                    updateStats();
+                }
+            }, (error) => {
+                console.error("Chyba při načítání záznamů:", error);
+                showToast("Chyba při načítání záznamů.", true);
+            });
+        }
+        
+        // Načte další záznamy pro stránkování
+        window.loadMoreEntries = async function() {
+            if (!lastVisible) {
+                showToast("Žádné další záznamy k načtení.");
+                document.getElementById('load-more-btn').classList.add('hidden');
+                return;
+            }
+            
+            const month = state.filters.month;
+            const year = state.filters.year;
+            const startOfMonth = new Date(year, month - 1, 1).getTime();
+            const endOfMonth = new Date(year, month, 0).getTime();
+            
+            let nextQuery = query(
+                entriesRef,
+                where("user", "==", state.currentUser),
+                where("timestamp", ">=", startOfMonth),
+                where("timestamp", "<=", endOfMonth),
+                orderBy("timestamp", "desc"),
+                startAfter(lastVisible),
+                limit(PAGE_SIZE)
+            );
+            
+            // Aplikace filtru typu
+            if (state.filters.type !== 'all') {
+                nextQuery = query(nextQuery, where("type", "==", state.filters.type));
+            }
+
+            // Aplikace filtru kategorie
+            if (state.filters.category !== 'all') {
+                 nextQuery = query(nextQuery, where("category", "==", state.filters.category));
+            }
+            
+            try {
+                const snapshot = await getDocs(nextQuery);
+                const newEntries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                state.entries = [...state.entries, ...newEntries];
+                lastVisible = snapshot.docs[snapshot.docs.length - 1];
+                renderEntries(false);
+                
+                if (newEntries.length < PAGE_SIZE) {
+                    document.getElementById('load-more-btn').classList.add('hidden');
+                }
+            } catch (error) {
+                console.error("Chyba při načítání dalších záznamů:", error);
+                showToast("Chyba při načítání dalších záznamů.", true);
+            }
+        }
+
+        // -------------------------------------------------------------------
+        // 4. POMOCNÉ A FORMÁTOVACÍ FUNKCE
+        // -------------------------------------------------------------------
+
+        // Formátuje čas v milisekundách na HH:MM:SS
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            return [hours, minutes, seconds]
+                .map(v => v < 10 ? "0" + v : v)
+                .join(":");
+        }
+        
+        // Vypočítá výdělek pro hodinovou práci
+        function calculateHourlyEarnings(durationMs) {
+            const rate = getUserRate();
+            const hours = durationMs / (1000 * 60 * 60);
+            return (hours * rate).toFixed(2);
+        }
+
+        // Formátuje datum
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleDateString('cs-CZ', { 
+                year: 'numeric', 
+                month: 'numeric', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        // Získání uživatelské sazby
+        function getUserRate() {
+            return state.settings.userRates[state.currentUser] || DEFAULT_RATE_EUR;
+        }
+        
+        // Získání měsíčního cíle
+        function getMonthlyGoal() {
+            return state.settings.monthlyGoals[state.currentUser] || DEFAULT_GOAL_EUR;
+        }
+        
+        // Získání kategorií
+        function getCategories() {
+            const userCategories = state.settings.categories[state.currentUser] || "";
+            let categories = userCategories.split(CATEGORY_DELIMITER).map(c => c.trim()).filter(c => c.length > 0);
+            
+            if (!categories.includes(state.settings.defaultCategory)) {
+                categories.push(state.settings.defaultCategory);
+            }
+            
+            return categories;
+        }
+
+        // -------------------------------------------------------------------
+        // 5. UI RENDEROVACÍ FUNKCE
+        // -------------------------------------------------------------------
+        
+        function renderUIOnLoad() {
+            // Nastavení počáteční aktivní záložky
+            switchEntryType(state.entryType);
+            
+            // Nastavení filtrů měsíců a let
+            const currentYear = new Date().getFullYear();
+            const filterMonth = document.getElementById('filter-month');
+            const filterYear = document.getElementById('filter-year');
+            const statsMonthYear = document.getElementById('stats-month-year');
+            
+            // Měsíce
+            const monthNames = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+            monthNames.forEach((name, index) => {
+                const value = index + 1;
+                const option = new Option(name, value);
+                filterMonth.add(option.cloneNode(true));
+                statsMonthYear.add(option.cloneNode(true));
+            });
+            
+            // Roky
+            for (let y = currentYear; y >= 2023; y--) {
+                const option = new Option(y, y);
+                filterYear.add(option.cloneNode(true));
+                statsMonthYear.add(option.cloneNode(true));
+            }
+            
+            // Nastavení aktuálního měsíce/roku jako výchozího
+            filterMonth.value = state.filters.month;
+            filterYear.value = state.filters.year;
+            statsMonthYear.value = `${state.filters.month}-${state.filters.year}`;
+            
+            // Nastavení data v sumáři
+            document.getElementById('summary-date-display').textContent = `${monthNames[state.filters.month - 1]} ${state.filters.year}`;
+            
+            // Nastavení výchozího zobrazení stránky
+            showPage(state.currentPage);
+        }
+        
+        // Vykreslí seznam kategorií
+        function renderCategorySelect() {
+            const selectElement = document.getElementById('entry-category');
+            const filterCategory = document.getElementById('filter-category');
+            const categories = getCategories();
+            
+            // Vyčistí a přidá výchozí volbu pro filtr
+            filterCategory.innerHTML = '<option value="all">Projekt: Vše</option>';
+            
+            // Vyčistí a přidá volby do formuláře
+            selectElement.innerHTML = '';
+            
+            categories.forEach(category => {
+                const option = new Option(category, category);
+                selectElement.add(option.cloneNode(true));
+                
+                if (category !== state.settings.defaultCategory) {
+                    filterCategory.add(option.cloneNode(true));
+                }
+            });
+            
+            // Nastaví výchozí kategorii
+            selectElement.value = state.settings.defaultCategory;
+            
+            // Nastaví hodnotu filtru
+            filterCategory.value = state.filters.category;
+        }
+
+        // Vykreslí seznam záznamů
+        function renderEntries(clear = true) {
+            const list = document.getElementById('entries-list');
+            const noEntries = document.getElementById('no-entries');
+            const loadMoreBtn = document.getElementById('load-more-btn');
+            
+            if (clear) {
+                list.innerHTML = '';
+            }
+
+            if (state.entries.length === 0) {
+                noEntries.classList.remove('hidden');
+                loadMoreBtn.classList.add('hidden');
+                return;
+            }
+            
+            noEntries.classList.add('hidden');
+            
+            state.entries.slice(clear ? 0 : state.entries.length - PAGE_SIZE).forEach(entry => {
+                const entryElement = document.createElement('div');
+                entryElement.className = 'bg-[#1f2937] p-4 rounded-xl shadow-md large-touch-target flex justify-between items-center';
+                entryElement.dataset.id = entry.id;
+                
+                let mainContent;
+                let detailContent;
+                let earnings;
+                let icon;
+                
+                if (entry.type === 'hourly') {
+                    const durationMs = entry.endTime - entry.startTime;
+                    const durationFormatted = formatTime(durationMs);
+                    earnings = calculateHourlyEarnings(durationMs);
+                    
+                    mainContent = `<span class="text-lg font-bold text-indigo-300">${durationFormatted}</span>`;
+                    detailContent = `<p class="text-xs text-gray-400">od ${formatDate(entry.startTime)}</p>`;
+                    icon = `<svg class="w-6 h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>`;
+                } else if (entry.type === 'task') {
+                    earnings = entry.earnings.toFixed(2);
+                    const taskName = TASK_TYPES[entry.taskType] ? TASK_TYPES[entry.taskType].name : 'Neznámý úkol';
+                    
+                    mainContent = `<span class="text-lg font-bold text-yellow-300">${taskName}</span>`;
+                    detailContent = `<p class="text-xs text-gray-400">Uloženo: ${formatDate(entry.timestamp)}</p>`;
+                    icon = `<svg class="w-6 h-6 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>`;
+                }
+                
+                entryElement.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        ${icon}
+                        <div>
+                            <p class="text-sm font-semibold">${entry.category}</p>
+                            ${detailContent}
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        ${mainContent}
+                        <p class="text-base font-extrabold text-[#818cf8] font-mono">${earnings} €</p>
+                    </div>
+                    <button class="text-red-500 hover:text-red-400 ml-3" onclick="deleteEntry('${entry.id}')">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                    </button>
+                `;
+                
+                list.appendChild(entryElement);
+            });
+            
+            // Zobrazit/skrýt tlačítko "Načíst Další"
+            if (state.entries.length % PAGE_SIZE === 0 && lastVisible) {
+                loadMoreBtn.classList.remove('hidden');
+            } else {
+                loadMoreBtn.classList.add('hidden');
+            }
+        }
+        
+        // Vykreslí nastavení
+        function renderSettings() {
+            const rate = getUserRate();
+            const goal = getMonthlyGoal();
+            const categories = state.settings.categories[state.currentUser] || "";
+            
+            document.getElementById('hourly-rate').value = rate.toFixed(2);
+            document.getElementById('monthly-goal').value = goal;
+            document.getElementById('categories-input').value = categories;
+        }
+        
+        // Aktualizuje souhrn
+        function updateSummary() {
+            let totalEarnings = 0;
+            let totalTimeMs = 0;
+            
+            // Přidání uložených záznamů
+            state.entries.forEach(entry => {
+                if (entry.type === 'hourly') {
+                    const durationMs = entry.endTime - entry.startTime;
+                    totalEarnings += parseFloat(calculateHourlyEarnings(durationMs));
+                    totalTimeMs += durationMs;
+                } else if (entry.type === 'task') {
+                    totalEarnings += entry.earnings;
+                }
+            });
+            
+            // Přidání běžícího časovače
+            let runningEarnings = 0;
+            if (state.timerStartTime) {
+                const now = Date.now();
+                const runningDurationMs = now - state.timerStartTime;
+                runningEarnings = parseFloat(calculateHourlyEarnings(runningDurationMs));
+                totalEarnings += runningEarnings;
+                totalTimeMs += runningDurationMs;
+                
+                // Aktualizace zobrazení běžící relace
+                const category = document.getElementById('entry-category').value;
+                document.getElementById('current-session').textContent = `Běžící relace: ${category} | ${formatTime(runningDurationMs)}`;
+            } else {
+                 document.getElementById('current-session').textContent = `Poslední relace: -`;
+            }
+
+            const monthlyGoal = getMonthlyGoal();
+            const remainingGoal = Math.max(0, monthlyGoal - totalEarnings);
+            const progressPercent = Math.min(100, (totalEarnings / monthlyGoal) * 100);
+            
+            document.getElementById('total-earnings').textContent = `${totalEarnings.toFixed(2)} €`;
+            document.getElementById('goal-display').textContent = `${monthlyGoal.toFixed(2)} €`;
+            document.getElementById('remaining-goal').textContent = `${remainingGoal.toFixed(2)} €`;
+            document.getElementById('total-time').textContent = Math.floor(totalTimeMs / (1000 * 60)); // Celkem minut
+            
+            const goalProgress = document.getElementById('goal-progress');
+            goalProgress.style.width = `${progressPercent}%`;
+            document.getElementById('goal-progress-text').textContent = `${progressPercent.toFixed(1)}% hotovo`;
+        }
+
+        // Aktualizuje zobrazení časovače
+        function updateTimerDisplay() {
+            if (state.timerStartTime) {
+                const durationMs = Date.now() - state.timerStartTime;
+                document.getElementById('timer-display').textContent = formatTime(durationMs);
+                updateSummary(); // Aktualizace souhrnu pro běžící výdělek
+            } else {
+                document.getElementById('timer-display').textContent = '00:00:00';
+            }
+        }
+        
+        // -------------------------------------------------------------------
+        // 6. FUNKCE PRO ZMĚNU DAT
+        // -------------------------------------------------------------------
+        
+        // Uloží nastavení
+        window.saveSettings = async function() {
+            vibrate(50);
+            if (!settingsRef) return;
+            
+            const rate = parseFloat(document.getElementById('hourly-rate').value);
+            const goal = parseInt(document.getElementById('monthly-goal').value);
+            const categories = document.getElementById('categories-input').value;
+            
+            if (isNaN(rate) || rate <= 0 || isNaN(goal) || goal <= 0) {
+                showToast("Neplatná sazba nebo cíl.", true);
+                return;
+            }
+            
+            try {
+                // Aktualizace sazeb a cílů
+                const updateData = {};
+                updateData[`userRates.${state.currentUser}`] = rate;
+                updateData[`monthlyGoals.${state.currentUser}`] = goal;
+                updateData[`categories.${state.currentUser}`] = categories;
+                
+                await updateDoc(settingsRef, updateData);
+                showToast("Nastavení uloženo!");
+            } catch (error) {
+                console.error("Chyba při ukládání nastavení:", error);
+                showToast("Chyba při ukládání nastavení.", true);
+            }
+        }
+        
+        // Smaže záznam
+        window.deleteEntry = async function(id) {
+            vibrate(50);
+            if (!confirm("Opravdu chcete smazat tento záznam?")) return;
+            
+            try {
+                await deleteDoc(doc(db, "entries", id));
+                showToast("Záznam smazán!");
+            } catch (error) {
+                console.error("Chyba při mazání záznamu:", error);
+                showToast("Chyba při mazání záznamu.", true);
+            }
+        }
+        
+        // Potvrzení smazání všech dat
+        window.confirmDeleteAllData = function() {
+            vibrate(50);
+            if (confirm("OPRAVDU CHCETE SMAZAT VŠECHNA DATA? Tato akce je nevratná!")) {
+                deleteAllData();
+            }
+        }
+        
+        // Smaže všechna data uživatele
+        async function deleteAllData() {
+            try {
+                // Smazání záznamů
+                const q = query(entriesRef, where("user", "==", state.currentUser));
+                const snapshot = await getDocs(q);
+                const deletePromises = snapshot.docs.map(d => deleteDoc(d.ref));
+                await Promise.all(deletePromises);
+                
+                // Smazání nastavení (pouze sazby, cíle a kategorie uživatele)
+                const settingsDoc = await getDoc(settingsRef);
+                if (settingsDoc.exists()) {
+                    const data = settingsDoc.data();
+                    if (data.userRates) delete data.userRates[state.currentUser];
+                    if (data.monthlyGoals) delete data.monthlyGoals[state.currentUser];
+                    if (data.categories) delete data.categories[state.currentUser];
+                    
+                    await setDoc(settingsRef, data);
+                }
+                
+                showToast("Všechna data smazána!", true);
+            } catch (error) {
+                console.error("Chyba při mazání všech dat:", error);
+                showToast("Chyba při mazání všech dat.", true);
+            }
+        }
+        
+        // -------------------------------------------------------------------
+        // 7. FILTRY A STATISTIKY
+        // -------------------------------------------------------------------
+        
+        // Aktualizuje filtry a znovu načte záznamy
+        window.updateFilters = function() {
+            vibrate(10);
+            const filterMonth = document.getElementById('filter-month').value;
+            const filterYear = document.getElementById('filter-year').value;
+            const filterType = document.getElementById('filter-type').value;
+            const filterCategory = document.getElementById('filter-category').value;
+            
+            state.filters.month = parseInt(filterMonth);
+            state.filters.year = parseInt(filterYear);
+            state.filters.type = filterType;
+            state.filters.category = filterCategory;
+            
+            const monthNames = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+            document.getElementById('summary-date-display').textContent = `${monthNames[state.filters.month - 1]} ${state.filters.year}`;
+            
+            setupEntriesListener(state.filters.month, state.filters.year);
+        }
+        
+        // Aktualizuje statistiky
+        window.updateStats = function() {
+            vibrate(10);
+            const statsSelect = document.getElementById('stats-month-year').value;
+            const [month, year] = statsSelect.split('-').map(Number);
+            
+            const filteredEntries = state.entries.filter(entry => {
+                const entryDate = new Date(entry.timestamp);
+                return entryDate.getMonth() + 1 === month && entryDate.getFullYear() === year;
+            });
+            
+            let totalEarnings = 0;
+            let hourlyTimeMs = 0;
+            let taskCount = 0;
+            const categoryEarnings = {};
+            const dailyEarnings = {};
+            
+            filteredEntries.forEach(entry => {
+                let earnings = 0;
+                let dateKey = new Date(entry.timestamp).toLocaleDateString('cs-CZ');
+                
+                if (entry.type === 'hourly') {
+                    const durationMs = entry.endTime - entry.startTime;
+                    earnings = parseFloat(calculateHourlyEarnings(durationMs));
+                    hourlyTimeMs += durationMs;
+                } else if (entry.type === 'task') {
+                    earnings = entry.earnings;
+                    taskCount++;
+                }
+                
+                totalEarnings += earnings;
+                categoryEarnings[entry.category] = (categoryEarnings[entry.category] || 0) + earnings;
+                dailyEarnings[dateKey] = (dailyEarnings[dateKey] || 0) + earnings;
+            });
+            
+            // Renderování statistik
+            const monthlyGoal = getMonthlyGoal();
+            const progressPercent = Math.min(100, (totalEarnings / monthlyGoal) * 100);
+            
+            document.getElementById('stats-total-earnings').textContent = `${totalEarnings.toFixed(2)} €`;
+            document.getElementById('stats-goal-display').textContent = `${progressPercent.toFixed(1)}%`;
+            document.getElementById('stats-goal-progress').style.width = `${progressPercent}%`;
+            document.getElementById('stats-hourly-time').textContent = Math.floor(hourlyTimeMs / (1000 * 60));
+            document.getElementById('stats-task-count').textContent = taskCount;
+            
+            // Graf Kategorie
+            renderCategoryChart(categoryEarnings);
+            
+            // Graf Denní Trend
+            renderDailyTrendChart(dailyEarnings, month, year);
+        }
+        
+        function renderCategoryChart(data) {
+            if (categoryChartInstance) {
+                categoryChartInstance.destroy();
+            }
+            
+            const ctx = document.getElementById('categoryChart').getContext('2d');
+            const labels = Object.keys(data);
+            const earnings = Object.values(data);
+            
+            categoryChartInstance = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: earnings,
+                        backgroundColor: [
+                            '#4f46e5', '#818cf8', '#a78bfa', '#c4b5fd', '#6366f1', '#4338ca'
+                        ],
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e5e7eb'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function renderDailyTrendChart(data, month, year) {
+            if (dailyTrendChartInstance) {
+                dailyTrendChartInstance.destroy();
+            }
+            
+            const ctx = document.getElementById('dailyTrendChart').getContext('2d');
+            
+            // Generování všech dnů v měsíci
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const allLabels = [];
+            const allData = [];
+            
+            for (let i = 1; i <= daysInMonth; i++) {
+                const date = new Date(year, month - 1, i);
+                const dateKey = date.toLocaleDateString('cs-CZ');
+                allLabels.push(i);
+                allData.push(data[dateKey] || 0);
+            }
+            
+            dailyTrendChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: allLabels,
+                    datasets: [{
+                        label: 'Denní Výdělek (€)',
+                        data: allData,
+                        backgroundColor: '#4f46e5',
+                        borderColor: '#818cf8',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Den v Měsíci',
+                                color: '#9ca3af'
+                            },
+                            ticks: {
+                                color: '#e5e7eb'
+                            },
+                            grid: {
+                                color: 'rgba(55, 65, 81, 0.5)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Výdělek (€)',
+                                color: '#9ca3af'
+                            },
+                            beginAtZero: true,
+                            ticks: {
+                                color: '#e5e7eb'
+                            },
+                            grid: {
+                                color: 'rgba(55, 65, 81, 0.5)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#e5e7eb'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // -------------------------------------------------------------------
+        // 8. EXPORT/IMPORT DAT
+        // -------------------------------------------------------------------
+        
+        window.exportData = async function() {
+            vibrate(50);
+            try {
+                // Načtení všech záznamů
+                const q = query(entriesRef, where("user", "==", state.currentUser), orderBy("timestamp", "desc"));
+                const snapshot = await getDocs(q);
+                const allEntries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                // Načtení nastavení
+                const settingsDoc = await getDoc(settingsRef);
+                const userSettings = {};
+                if (settingsDoc.exists()) {
+                    const data = settingsDoc.data();
+                    userSettings.hourlyRate = data.userRates ? data.userRates[state.currentUser] : DEFAULT_RATE_EUR;
+                    userSettings.monthlyGoal = data.monthlyGoals ? data.monthlyGoals[state.currentUser] : DEFAULT_GOAL_EUR;
+                    userSettings.categories = data.categories ? data.categories[state.currentUser] : "";
+                }
+                
+                const exportObject = {
+                    metadata: {
+                        version: "WorkTimeTracker_v8.0_Export",
+                        exportDate: new Date().toISOString(),
+                        userId: state.currentUser
+                    },
+                    settings: userSettings,
+                    entries: allEntries
+                };
+                
+                const jsonString = JSON.stringify(exportObject, null, 2);
+                const blob = new Blob([jsonString], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `worktime_export_${state.currentUser.substring(0, 8)}_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                showToast("Data exportována!");
+            } catch (error) {
+                console.error("Chyba při exportu dat:", error);
+                showToast("Chyba při exportu dat.", true);
+            }
+        }
+        
+        window.importData = function() {
+            vibrate(50);
+            document.getElementById('import-file').click();
+        }
+        
+        window.handleImportFile = function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const content = JSON.parse(e.target.result);
+                    
+                    if (content.metadata && content.metadata.version === "WorkTimeTracker_v8.0_Export") {
+                        if (confirm("Opravdu chcete importovat data? Stávající data NEBUDOU přepsána, ale nová data se PŘIDAJÍ.")) {
+                            await processImport(content);
+                            showToast("Import dat dokončen!");
+                        }
+                    } else {
+                        showToast("Neplatný formát souboru pro import.", true);
+                    }
+                } catch (error) {
+                    console.error("Chyba při čtení nebo parsování souboru:", error);
+                    showToast("Chyba při čtení nebo parsování souboru.", true);
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        async function processImport(data) {
+            // 1. Import nastavení
+            const settingsToUpdate = {};
+            if (data.settings.hourlyRate) {
+                settingsToUpdate[`userRates.${state.currentUser}`] = data.settings.hourlyRate;
+            }
+            if (data.settings.monthlyGoal) {
+                settingsToUpdate[`monthlyGoals.${state.currentUser}`] = data.settings.monthlyGoal;
+            }
+            if (data.settings.categories) {
+                settingsToUpdate[`categories.${state.currentUser}`] = data.settings.categories;
+            }
+            
+            if (Object.keys(settingsToUpdate).length > 0) {
+                await updateDoc(settingsRef, settingsToUpdate);
+            }
+            
+            // 2. Import záznamů
+            const importPromises = data.entries.map(entry => {
+                // Odstranění ID, aby se vytvořil nový dokument
+                const { id, ...newEntry } = entry;
+                // Zajištění, že záznam patří aktuálnímu uživateli
+                newEntry.user = state.currentUser; 
+                return addDoc(entriesRef, newEntry);
+            });
+            
+            await Promise.all(importPromises);
+        }
+
+        // -------------------------------------------------------------------
+        // 9. AUTENTIZACE A SPUSŠTĚNÍ
+        // -------------------------------------------------------------------
+
+        // Posluchač pro změnu stavu autentizace
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                state.currentUser = user.uid;
+                document.getElementById('user-display').textContent = `(ID: ${state.currentUser.substring(0, 8)}...)`;
+                
+                renderUIOnLoad();
+                setupSettingsListener();
+                setupEntriesListener(state.filters.month, state.filters.year);
+
+            } else {
+                console.log("Přihlašuji anonymně.");
+                await signInAnonymously(auth);
+            }
+        });
+
+        async function initAuth() {
+            try {
+                document.getElementById('loading-indicator').classList.remove('hidden');
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Chyba při autentizaci:", error);
+                document.getElementById('loading-indicator').innerHTML = '<p class="text-red-500">Chyba autentizace.</p>';
+            }
+        }
+
+        // UI FUNKCE
+        window.showToast = function(message, isError = false) {
+            const toast = document.getElementById('toast-notification');
+            toast.textContent = message;
+            toast.className = 'toast show';
+            if (isError) toast.classList.add('error');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        window.showPage = function(pageId) {
+            vibrate(10);
+            state.currentPage = pageId;
+
+            document.getElementById('page-timer').classList.add('hidden');
+            document.getElementById('page-stats').classList.add('hidden');
+            document.getElementById('page-settings').classList.add('hidden');
+            document.getElementById(`page-${pageId}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`nav-${pageId}`).classList.add('active');
+            
+            if(pageId === 'stats') {
+                updateStats();
+            }
+        }
+
+        function vibrate(duration = 10) {
+            if ('vibrate' in navigator) {
+                navigator.vibrate(duration);
+            }
+        }
+
+        window.switchEntryType = function(type) {
+            vibrate();
+            state.entryType = type;
+            const hourlyForm = document.getElementById('form-hourly');
+            const taskForm = document.getElementById('form-task');
+            const tabHourly = document.getElementById('tab-hourly');
+            const tabTask = document.getElementById('tab-task');
+
+            tabHourly.classList.remove('bg-indigo-700', 'text-white');
+            tabTask.classList.remove('bg-indigo-700', 'text-white');
+
+            if (type === 'hourly') {
+                hourlyForm.classList.remove('hidden');
+                taskForm.classList.add('hidden');
+                tabHourly.classList.add('bg-indigo-700', 'text-white');
+            } else {
+                hourlyForm.classList.add('hidden');
+                taskForm.classList.remove('hidden');
+                tabTask.classList.add('bg-indigo-700', 'text-white');
+            }
+        }
+
+        function getUserRate() {
+            return state.settings.userRates[state.currentUser] || DEFAULT_RATE_EUR;
+        }
+
+        // TIMER FUNKCE
+        window.toggleTimer = async function() {
+            vibrate(50);
+            if (!settingsRef) return;
+
+            const selectedCategory = document.getElementById('entry-category').value;
+            
+            if (!selectedCategory && !state.timerStartTime) {
+                 showToast("Vyberte prosím kategorii před zahájením práce.", true);
+                 const categorySelect = document.getElementById('entry-category');
+                 categorySelect.classList.add('border-red-500', 'animate-pulse');
+                 setTimeout(() => categorySelect.classList.remove('border-red-500', 'animate-pulse'), 1000);
+                 return;
+            }
+
+            if (state.timerStartTime) {
+                // ZASTAVENÍ
+                const now = Date.now();
+                const duration = now - state.timerStartTime;
+                
+                const newEntry = {
+                    user: state.currentUser,
+                    type: 'hourly',
+                    category: document.getElementById('entry-category').value,
+                    startTime: state.timerStartTime,
+                    endTime: now,
+                    duration: duration,
+                    timestamp: now
+                };
+
+                try {
+                    await addDoc(entriesRef, newEntry);
+                    await updateDoc(settingsRef, { timerStartTime: null });
+                    showToast("Práce uložena!");
+                } catch (error) {
+                    console.error("Chyba při ukládání záznamu:", error);
+                    showToast("Chyba při ukládání práce.", true);
+                }
+                
+                clearInterval(timerInterval);
+                timerInterval = null;
+                
+            } else {
+                // SPUŠTĚNÍ
+                try {
+                    await updateDoc(settingsRef, { timerStartTime: Date.now() });
+                } catch (error) {
+                    console.error("Chyba při startu časovače:", error);
+                    showToast("Chyba při startu časovače.", true);
+                }
+            }
+        }
+        
+        window.saveTaskEntry = async function() {
+            vibrate(50);
+            const taskType = document.getElementById('task-type').value;
+            const category = document.getElementById('entry-category').value;
+            
+            if (!category) {
+                showToast("Vyberte prosím kategorii.", true);
+                return;
+            }
+            
+            if (!entriesRef) return;
+            
+            const newEntry = {
+                user: state.currentUser,
+                type: 'task',
+                category: category,
+                taskType: taskType,
+                earnings: TASK_TYPES[taskType].earnings,
+                timestamp: Date.now()
+            };
+            
+            try {
+                await addDoc(entriesRef, newEntry);
+                showToast(`${TASK_TYPES[taskType].name} uložen!`);
+            } catch (error) {
+                console.error("Chyba při ukládání úkolu:", error);
+                showToast("Chyba při ukládání úkolu.", true);
+            }
+        }
+
+        function startTimerDisplay() {
+            clearInterval(timerInterval);
+            
+            if (state.timerStartTime) {
+                const btn = document.getElementById('start-stop-button');
+                const statusText = document.querySelector('#timer-status span:first-child');
+                
+                btn.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10h6v6H9z"></path></svg><span>ZASTAVIT PRÁCI</span>`;
+                btn.classList.remove('btn-primary');
+                btn.classList.add('bg-red-600', 'hover:bg-red-700');
+                statusText.textContent = 'BĚŽÍ';
+                statusText.classList.remove('text-yellow-400');
+                statusText.classList.add('text-green-400');
+                
+                timerInterval = setInterval(updateTimerDisplay, 1000);
+                updateTimerDisplay();
+            } else {
+                const btn = document.getElementById('start-stop-button');
+                const statusText = document.querySelector('#timer-status span:first-child');
+                
+                btn.innerHTML = `<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>ZAHÁJIT PRÁCI</span>`;
+                btn.classList.add('btn-primary');
+                btn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                statusText.textContent = 'STOP';
+                statusText.classList.add('text-yellow-400');
+                statusText.classList.remove('text-green-400');
+                
+                document.getElementById('timer-display').textContent = '00:00:00';
+            }
+        }
+        
+        // Spuštění autentizace
+        initAuth();
+    </script>
+</body>
+</html>
