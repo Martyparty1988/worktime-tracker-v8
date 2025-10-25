@@ -1,535 +1,1747 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>WorkTime Tracker v7.1 (€) - Stoly</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#1e293b">
+    <title>Solar Work Count Lithuania by Marty Party</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="#" id="manifest-placeholder">
+    
+    <!-- PDF.js Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --color-primary: #3b82f6;
+            --color-primary-dark: #2563eb;
+            --color-success: #4ade80;
+            --color-danger: #ef4444;
+            --color-bg-dark: #0f172a;
+            --color-bg-card: rgba(30, 41, 59, 0.8);
+            --color-text: #f1f5f9;
+            --color-text-secondary: #94a3b8;
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0c0d12;
-            color: #e5e7eb;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding-bottom: env(safe-area-inset-bottom);
+            overflow-x: hidden;
         }
-        .app-container {
-            max-width: 450px;
+
+        /* Glassmorphism */
+        .glass {
+            background: var(--color-bg-card);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
-        .glow-main {
-            box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+
+        /* Header */
+        .header {
+            padding: max(env(safe-area-inset-top), 16px) 16px 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.8);
         }
-        .btn-primary {
-            background-color: #4f46e5;
-            color: #ffffff;
+
+        .header h1 {
+            font-size: 20px;
             font-weight: 700;
-            transition: all 0.2s;
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
-        .btn-primary:hover {
-            background-color: #4338ca;
+
+        /* Pages Container */
+        .pages-container {
+            min-height: calc(100vh - 140px);
+            padding: 16px;
+            padding-bottom: calc(80px + env(safe-area-inset-bottom));
         }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Canvas Container */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 250px);
+            overflow: hidden;
+            border-radius: var(--border-radius);
+            touch-action: none;
+            background: #1e293b;
+        }
+
+        #pdfCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 12px 24px;
+            border-radius: var(--border-radius);
+            border: none;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 44px;
+            touch-action: manipulation;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--color-primary) 0%, #8b5cf6 100%);
+            color: white;
+        }
+
         .btn-primary:active {
             transform: scale(0.98);
         }
+
         .btn-secondary {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            color: #d1d5db;
-            transition: background-color 0.2s;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--color-text);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
-        .btn-secondary:hover {
-            background-color: #374151;
+
+        .btn-danger {
+            background: var(--color-danger);
+            color: white;
         }
-        input[type='text'],
-        input[type='number'],
-        input[type='datetime-local'],
-        select {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            color: #e5e7eb;
-            padding: 10px 14px;
+
+        .btn-success {
+            background: var(--color-success);
+            color: #0f172a;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--color-text-secondary);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px;
             border-radius: 8px;
-            transition: border-color 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--color-text);
+            font-size: 16px;
+            transition: var(--transition);
         }
-        input:focus,
-        select:focus {
-            border-color: #4f46e5;
+
+        .form-control:focus {
             outline: none;
-            box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.5);
+            border-color: var(--color-primary);
+            background: rgba(255, 255, 255, 0.08);
         }
-        input[type='datetime-local']::-webkit-calendar-picker-indicator {
-            background-color: #9ca3af;
-            border-radius: 2px;
+
+        select.form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23f1f5f9' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
         }
-        .tab-active {
-            background-color: #1f2937;
-            border-bottom: 2px solid #4f46e5;
-            color: #e5e7eb;
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            padding: 20px;
+            overflow-y: auto;
+            align-items: center;
+            justify-content: center;
         }
-        .large-touch-target {
-            min-height: 48px;
+
+        .modal.active {
+            display: flex;
         }
-        .progress-bar {
-            height: 10px;
-            background-color: #374151;
-            border-radius: 5px;
-            overflow: hidden;
+
+        .modal-content {
+            background: var(--color-bg-card);
+            backdrop-filter: blur(20px);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            max-width: 500px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            animation: slideUp 0.3s ease-out;
         }
-        .progress-fill {
-            background-color: #4f46e5;
-            transition: width 0.5s ease-in-out;
+
+        @keyframes slideUp {
+            from { transform: translateY(30px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--color-text);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 20px);
+            right: 20px;
+            left: 20px;
+            padding: 16px;
+            border-radius: var(--border-radius);
+            color: white;
+            font-weight: 600;
+            z-index: 2000;
+            transform: translateY(-150%);
+            transition: transform 0.3s ease-out;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .toast.show {
+            transform: translateY(0);
+        }
+
+        .toast-success {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+        }
+
+        .toast-error {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+
+        .toast-info {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        }
+
+        /* Bottom Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+            z-index: 100;
+        }
+
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px;
+            color: var(--color-text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .nav-item.active {
+            color: var(--color-primary);
+        }
+
+        .nav-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .nav-label {
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--color-bg-card);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--color-text);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Record Item */
+        .record-item {
+            background: var(--color-bg-card);
+            border-radius: var(--border-radius);
+            padding: 16px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .record-type {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .record-type-task {
+            background: rgba(74, 222, 128, 0.2);
+            color: var(--color-success);
+        }
+
+        .record-type-hourly {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--color-primary);
+        }
+
+        .record-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .record-btn {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        /* Loader */
+        .loader {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 2000;
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        .loader-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: var(--color-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Timer Display */
+        .timer-display {
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            margin: 24px 0;
+            font-family: 'Courier New', monospace;
+            color: var(--color-primary);
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--color-text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Utility Classes */
+        .mb-8 { margin-bottom: 8px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mb-24 { margin-bottom: 24px; }
+        .mt-16 { margin-top: 16px; }
+        .text-center { text-align: center; }
+        .flex { display: flex; }
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .gap-8 { gap: 8px; }
+        .w-full { width: 100%; }
+
+        /* Worker/Project List */
+        .list-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .list-item-info {
+            flex: 1;
+        }
+
+        .list-item-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .list-item-subtitle {
+            font-size: 14px;
+            color: var(--color-text-secondary);
+        }
+
+        /* Chart placeholder */
+        .chart-placeholder {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--border-radius);
+            padding: 40px;
+            text-align: center;
+            color: var(--color-text-secondary);
+            margin-bottom: 16px;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     </style>
 </head>
-<body class="p-4 flex justify-center large-touch-target">
-    <div id="app" class="app-container w-full">
-        <header class="mb-8 text-center">
-            <h1 class="text-4xl font-extrabold text-[#4f46e5] glow-main large-touch-target">WorkTime v7.1</h1>
-            <p class="text-sm text-gray-400">Sledování výkonu s kategoriemi a cíli | Měna: EUR (€)</p>
-        </header>
+<body>
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
 
-        <div id="main-content">
-            <section id="new-entry-form" class="bg-[#111827] p-5 rounded-2xl mb-8 shadow-2xl large-touch-target">
-                <h2 class="text-2xl font-bold mb-4 border-b border-gray-700 pb-2">Nová Činnost</h2>
-                <div class="flex large-touch-target mb-4 border border-gray-700 rounded-lg overflow-hidden">
-                    <button id="tab-hourly" class="flex-1 py-3 text-sm font-semibold tab-active" onclick="switchEntryType('hourly')">Hodinová Práce</button>
-                    <button id="tab-task" class="flex-1 py-3 text-sm font-semibold" onclick="switchEntryType('task')">Úkolová Práce</button>
-                </div>
-                <div class="mb-4">
-                    <label for="entry-category" class="block text-sm font-medium mb-1 text-gray-400">Kategorie / Projekt:</label>
-                    <select id="entry-category" class="w-full large-touch-target"></select>
-                </div>
-                <div id="form-hourly">
-                    <div class="flex justify-between items-center mb-4 p-3 bg-gray-800 rounded-lg">
-                        <span class="text-sm font-medium text-gray-400">Stav:</span>
-                        <div id="timer-status" class="flex items-center text-2xl font-mono font-bold">
-                            <span class="mr-2 text-yellow-400">STOP</span>
-                            <span id="timer-display">00:00:00</span>
-                        </div>
-                    </div>
-                    <button id="start-stop-button" class="w-full large-touch-target py-3 rounded-xl btn-primary mb-3 shadow-lg" onclick="toggleTimer()">ZAHÁJIT PRÁCI</button>
-                    <p id="current-session" class="text-xs text-gray-500 text-center">Poslední relace: -</p>
-                </div>
-                <div id="form-task" class="hidden space-y-4">
-                    <div>
-                        <label for="task-type" class="block text-sm font-medium mb-1 text-gray-400">Typ Stolu:</label>
-                        <select id="task-type" class="w-full large-touch-target">
-                            <option value="maly">Malý stůl (30 €)</option>
-                            <option value="stredni">Střední stůl (48 €)</option>
-                            <option value="velky">Velký stůl (60 €)</option>
-                        </select>
-                    </div>
-                    <button class="w-full large-touch-target py-3 rounded-xl btn-primary shadow-lg" onclick="saveTaskEntry()">ULOŽIT ÚKOL</button>
-                </div>
-            </section>
+    <!-- Loader -->
+    <div id="loader" class="loader">
+        <div class="loader-spinner"></div>
+    </div>
 
-            <section class="bg-[#1f2937] p-5 rounded-2xl mb-8 shadow-xl large-touch-target">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold">Přehled</h2>
-                    <span id="summary-date-display" class="text-sm font-semibold text-indigo-400">Leden 2025</span>
-                </div>
-                <div class="flex justify-between items-end mb-4 border-b border-gray-700 pb-3">
-                    <span class="text-gray-400 text-sm">Výdělek (vč. běžícího):</span>
-                    <span id="total-earnings" class="text-3xl font-extrabold text-[#818cf8] font-mono">0.00 €</span>
-                </div>
-                <div class="space-y-3">
-                    <div class="flex justify-between text-sm font-semibold">
-                        <span class="text-gray-400">Měsíční Cíl (€):</span>
-                        <span id="goal-display" class="text-indigo-400">500.00 €</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div id="goal-progress" class="progress-fill h-full" style="width: 0%;"></div>
-                    </div>
-                    <p id="goal-progress-text" class="text-sm text-center text-gray-400">0% hotovo</p>
-                </div>
-                <div class="flex justify-between mt-4">
-                    <div class="text-center">
-                        <p class="text-gray-500 text-xs">Celkem Času (min):</p>
-                        <p id="total-time" class="font-bold text-lg text-green-400">0</p>
-                    </div>
-                    <div class="text-center">
-                        <p class="text-gray-500 text-xs">Zbývá do Cíle (€):</p>
-                        <p id="remaining-goal" class="font-bold text-lg text-red-400">500.00 €</p>
-                    </div>
-                </div>
-            </section>
+    <!-- Header -->
+    <div class="header">
+        <h1>Solar Work Count Lithuania</h1>
+        <div style="font-size: 12px; color: var(--color-text-secondary); margin-top: 4px;">by Marty Party</div>
+    </div>
 
-            <section class="mb-8">
-                <h2 class="text-2xl font-bold mb-4">Záznamy <span id="user-display" class="text-sm text-gray-500"></span></h2>
-                <div class="grid grid-cols-2 gap-2 mb-4">
-                    <select id="filter-month" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()"></select>
-                    <select id="filter-year" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()"></select>
-                    <select id="filter-type" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()">
-                        <option value="all">Typ: Vše</option>
-                        <option value="hourly">Typ: Hodinová</option>
-                        <option value="task">Typ: Úkolová</option>
-                    </select>
-                    <select id="filter-category" class="w-full py-2 text-sm large-touch-target" onchange="updateFilters()">
-                        <option value="all">Projekt: Vše</option>
+    <!-- Pages Container -->
+    <div class="pages-container">
+        <!-- PAGE 1: PLÁN -->
+        <div id="page-plan" class="page active">
+            <div class="card mb-16">
+                <div class="form-group">
+                    <label class="form-label">Vyberte Projekt</label>
+                    <select id="projectSelect" class="form-control">
+                        <option value="">-- Vyberte projekt --</option>
                     </select>
                 </div>
-                <div id="entries-list" class="space-y-3">
-                    <p id="no-entries" class="text-gray-500 text-center p-4 large-touch-target">Žádné záznamy k zobrazení.</p>
-                </div>
-            </section>
+            </div>
 
-            <section class="bg-[#111827] p-5 rounded-2xl mb-6 shadow-xl large-touch-target">
-                <h2 class="text-xl font-bold mb-4 border-b border-gray-700 pb-2">Nastavení</h2>
-                <div class="mb-4">
-                    <label for="hourly-rate" class="block text-sm font-medium mb-1 text-gray-400">Hodinová Sazba (€/h):</label>
-                    <div class="flex space-x-2">
-                        <input type="number" id="hourly-rate" value="10.00" min="1" step="0.01" class="flex-1 rounded-lg large-touch-target" />
-                        <button class="py-2 px-4 rounded-lg btn-secondary large-touch-target" onclick="saveRate()">Uložit</button>
+            <div id="canvasWrapper" style="display: none;">
+                <div class="flex-between mb-16">
+                    <div style="font-size: 14px; color: var(--color-text-secondary);">
+                        Ťukněte na plán pro přidání hotového stolu
                     </div>
+                    <button id="resetZoom" class="btn-secondary" style="padding: 8px 16px; font-size: 14px;">Reset Zoom</button>
                 </div>
-                <div class="mb-6">
-                    <label for="monthly-goal" class="block text-sm font-medium mb-1 text-gray-400">Měsíční Cíl (€):</label>
-                    <div class="flex space-x-2">
-                        <input type="number" id="monthly-goal" value="500.00" min="1" step="1" class="flex-1 rounded-lg large-touch-target" />
-                        <button class="py-2 px-4 rounded-lg btn-secondary large-touch-target" onclick="saveGoal()">Uložit</button>
-                    </div>
+                <div class="canvas-container glass" id="canvasContainer">
+                    <canvas id="pdfCanvas"></canvas>
                 </div>
-                <div class="space-y-3 pt-4 border-t border-gray-700">
-                    <button class="w-full py-2 rounded-lg btn-secondary large-touch-target" onclick="showCategoryManager()">Správa Kategorií</button>
-                    <button class="w-full py-2 rounded-lg btn-secondary large-touch-target" onclick="exportToCSV()">Exportovat do CSV</button>
-                    <button class="w-full py-2 rounded-lg bg-red-800 hover:bg-red-700 text-white font-bold large-touch-target" onclick="showConfirmDelete()">Smazat Všechny Záznamy</button>
-                </div>
-            </section>
-        </div>
+            </div>
 
-        <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 hidden z-50">
-            <div class="bg-[#1f2937] p-6 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
-                <h3 class="text-xl font-bold mb-4 text-red-400">Potvrdit Smazání</h3>
-                <p class="mb-6 text-gray-300">Opravdu chcete smazat VŠECHNY záznamy? Tato akce je nevratná.</p>
-                <div class="flex justify-end space-x-3">
-                    <button class="py-2 px-4 rounded-lg btn-secondary large-touch-target" onclick="hideConfirmDelete()">Zrušit</button>
-                    <button class="py-2 px-4 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold large-touch-target" onclick="deleteAllEntries()">Smazat</button>
-                </div>
+            <div id="noPlanMessage" class="empty-state">
+                <div class="empty-state-icon">📋</div>
+                <div>Nejprve vyberte projekt s nahraným PDF plánem</div>
+                <button onclick="navigateTo('settings')" class="btn btn-primary mt-16">Přidat Projekt</button>
             </div>
         </div>
 
-        <div id="category-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 hidden z-50">
-            <div class="bg-[#1f2937] p-6 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
-                <h3 class="text-xl font-bold mb-4 text-indigo-400">Správa Kategorií</h3>
-                <div class="flex space-x-2 mb-4">
-                    <input type="text" id="new-category-name" placeholder="Nový projekt/kategorie" class="flex-1 large-touch-target" />
-                    <button class="py-2 px-4 rounded-lg btn-primary large-touch-target" onclick="addCategory()">Přidat</button>
+        <!-- PAGE 2: ZÁZNAMY -->
+        <div id="page-records" class="page">
+            <div class="card mb-24">
+                <h2 class="mb-16" style="font-size: 18px;">Časovač Směny</h2>
+                <div class="form-group">
+                    <label class="form-label">Pracovník</label>
+                    <select id="timerWorker" class="form-control">
+                        <option value="">-- Vyberte pracovníka --</option>
+                    </select>
                 </div>
-                <div class="space-y-2 max-h-60 overflow-y-auto" id="category-list"></div>
-                <div class="flex justify-end mt-6">
-                    <button class="py-2 px-4 rounded-lg btn-secondary large-touch-target" onclick="hideCategoryManager()">Zavřít</button>
+                <div class="timer-display" id="timerDisplay">00:00:00</div>
+                <div class="flex gap-8">
+                    <button id="startShift" class="btn btn-success w-full">Začít Směnu</button>
+                    <button id="stopShift" class="btn btn-danger w-full" style="display: none;">Ukončit Směnu</button>
                 </div>
+            </div>
+
+            <div class="flex-between mb-16">
+                <h2 style="font-size: 18px;">Všechny Záznamy</h2>
+                <select id="recordsFilter" class="form-control" style="width: auto; padding: 8px 32px 8px 12px;">
+                    <option value="all">Vše</option>
+                    <option value="task">Stoly</option>
+                    <option value="hourly">Hodiny</option>
+                </select>
+            </div>
+
+            <div id="recordsList"></div>
+        </div>
+
+        <!-- PAGE 3: STATISTIKY -->
+        <div id="page-statistics" class="page">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotalEarnings">€0</div>
+                    <div class="stat-label">Celkové Výdělky</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotalHours">0h</div>
+                    <div class="stat-label">Celkové Hodiny</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statTotalTables">0</div>
+                    <div class="stat-label">Celkem Stolů</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="statAvgReward">€0</div>
+                    <div class="stat-label">Průměr/Stůl</div>
+                </div>
+            </div>
+
+            <div class="card mb-16">
+                <h3 class="mb-16" style="font-size: 16px;">Filtry</h3>
+                <div class="form-group">
+                    <label class="form-label">Pracovník</label>
+                    <select id="statsWorkerFilter" class="form-control">
+                        <option value="">Všichni pracovníci</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Projekt</label>
+                    <select id="statsProjectFilter" class="form-control">
+                        <option value="">Všechny projekty</option>
+                    </select>
+                </div>
+            </div>
+
+            <h3 class="mb-16" style="font-size: 16px;">Výdělky podle Pracovníků</h3>
+            <div id="workerEarningsChart" class="chart-placeholder">
+                <div>Graf se zobrazí zde</div>
+            </div>
+
+            <h3 class="mb-16" style="font-size: 16px;">Rozdělení: Stoly vs Hodiny</h3>
+            <div id="taskVsHourlyChart" class="chart-placeholder">
+                <div>Graf se zobrazí zde</div>
             </div>
         </div>
 
-        <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 hidden z-50">
-            <div class="bg-[#1f2937] p-6 rounded-xl shadow-2xl w-full max-w-sm border border-gray-700">
-                <h3 class="text-xl font-bold mb-4 text-indigo-400">Upravit Záznam</h3>
-                <input type="hidden" id="edit-entry-id" />
-                <div class="space-y-4">
-                    <div>
-                        <label for="edit-category" class="block text-sm font-medium mb-1 text-gray-400">Kategorie / Projekt:</label>
-                        <select id="edit-category" class="w-full large-touch-target"></select>
-                    </div>
-                    <div id="edit-form-hourly" class="space-y-4">
-                        <div>
-                            <label for="edit-start-time" class="block text-sm font-medium mb-1 text-gray-400">Začátek:</label>
-                            <input type="datetime-local" id="edit-start-time" class="w-full large-touch-target" />
-                        </div>
-                        <div>
-                            <label for="edit-end-time" class="block text-sm font-medium mb-1 text-gray-400">Konec:</label>
-                            <input type="datetime-local" id="edit-end-time" class="w-full large-touch-target" />
-                        </div>
-                    </div>
-                    <div id="edit-form-task" class="space-y-4 hidden">
-                        <div>
-                            <label for="edit-task-type" class="block text-sm font-medium mb-1 text-gray-400">Typ Stolu:</label>
-                            <select id="edit-task-type" class="w-full large-touch-target">
-                                <option value="maly">Malý stůl (30 €)</option>
-                                <option value="stredni">Střední stůl (48 €)</option>
-                                <option value="velky">Velký stůl (60 €)</option>
-                            </select>
-                        </div>
-                    </div>
+        <!-- PAGE 4: NASTAVENÍ -->
+        <div id="page-settings" class="page">
+            <div class="card mb-24">
+                <h2 class="mb-16" style="font-size: 18px;">Správa Projektů</h2>
+                <button onclick="openProjectModal()" class="btn btn-primary w-full mb-16">Přidat Nový Projekt</button>
+                <div id="projectsList"></div>
+            </div>
+
+            <div class="card mb-24">
+                <h2 class="mb-16" style="font-size: 18px;">Správa Pracovníků</h2>
+                <button onclick="openWorkerModal()" class="btn btn-primary w-full mb-16">Přidat Nového Pracovníka</button>
+                <div id="workersList"></div>
+            </div>
+
+            <div class="card">
+                <h2 class="mb-16" style="font-size: 18px;">Denní Report</h2>
+                <div class="form-group">
+                    <label class="form-label">Datum</label>
+                    <input type="date" id="reportDate" class="form-control">
                 </div>
-                <div class="flex justify-end space-x-3 mt-6">
-                    <button class="py-2 px-4 rounded-lg btn-secondary large-touch-target" onclick="hideEditModal()">Zrušit</button>
-                    <button class="py-2 px-4 rounded-lg btn-primary large-touch-target" onclick="saveEntryChanges()">Uložit Změny</button>
-                </div>
+                <button onclick="generateDailyReport()" class="btn btn-primary w-full">Generovat Denní Report</button>
             </div>
         </div>
     </div>
 
+    <!-- Bottom Navigation -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" onclick="navigateTo('plan')" data-page="plan">
+            <div class="nav-icon">📋</div>
+            <div class="nav-label">Plán</div>
+        </div>
+        <div class="nav-item" onclick="navigateTo('records')" data-page="records">
+            <div class="nav-icon">📝</div>
+            <div class="nav-label">Záznamy</div>
+        </div>
+        <div class="nav-item" onclick="navigateTo('statistics')" data-page="statistics">
+            <div class="nav-icon">📊</div>
+            <div class="nav-label">Statistiky</div>
+        </div>
+        <div class="nav-item" onclick="navigateTo('settings')" data-page="settings">
+            <div class="nav-icon">⚙️</div>
+            <div class="nav-label">Nastavení</div>
+        </div>
+    </nav>
+
+    <!-- Modal: Add/Edit Project -->
+    <div id="projectModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="projectModalTitle">Přidat Nový Projekt</h3>
+                <button class="modal-close" onclick="closeModal('projectModal')">&times;</button>
+            </div>
+            <form id="projectForm" onsubmit="saveProject(event)">
+                <input type="hidden" id="projectId">
+                <div class="form-group">
+                    <label class="form-label">Jméno Projektu</label>
+                    <input type="text" id="projectName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Plán PDF</label>
+                    <input type="file" id="projectPDF" class="form-control" accept="application/pdf">
+                    <div id="currentPDF" style="font-size: 12px; color: var(--color-text-secondary); margin-top: 8px;"></div>
+                </div>
+                <div class="flex gap-8">
+                    <button type="button" onclick="closeModal('projectModal')" class="btn btn-secondary w-full">Zrušit</button>
+                    <button type="submit" class="btn btn-primary w-full">Uložit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add/Edit Worker -->
+    <div id="workerModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title" id="workerModalTitle">Přidat Nového Pracovníka</h3>
+                <button class="modal-close" onclick="closeModal('workerModal')">&times;</button>
+            </div>
+            <form id="workerForm" onsubmit="saveWorker(event)">
+                <input type="hidden" id="workerId">
+                <div class="form-group">
+                    <label class="form-label">Jméno</label>
+                    <input type="text" id="workerName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Hodinová Sazba (€)</label>
+                    <input type="number" id="workerRate" class="form-control" step="0.01" min="0" required>
+                </div>
+                <div class="flex gap-8">
+                    <button type="button" onclick="closeModal('workerModal')" class="btn btn-secondary w-full">Zrušit</button>
+                    <button type="submit" class="btn btn-primary w-full">Uložit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Task (Pin on Plan) -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Zadat Hotový Stůl</h3>
+                <button class="modal-close" onclick="closeModal('taskModal')">&times;</button>
+            </div>
+            <form id="taskForm" onsubmit="saveTask(event)">
+                <input type="hidden" id="taskX">
+                <input type="hidden" id="taskY">
+                <div class="form-group">
+                    <label class="form-label">Pracovník</label>
+                    <select id="taskWorker" class="form-control" required>
+                        <option value="">-- Vyberte pracovníka --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Číslo Stolu/Stringu</label>
+                    <input type="text" id="taskTableNumber" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Odměna (€)</label>
+                    <input type="number" id="taskReward" class="form-control" step="0.01" min="0" required>
+                </div>
+                <div class="flex gap-8">
+                    <button type="button" onclick="closeModal('taskModal')" class="btn btn-secondary w-full">Zrušit</button>
+                    <button type="submit" class="btn btn-primary w-full">Uložit</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Daily Report -->
+    <div id="reportModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Denní Report</h3>
+                <button class="modal-close" onclick="closeModal('reportModal')">&times;</button>
+            </div>
+            <div id="reportContent" style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; font-family: monospace; font-size: 14px; white-space: pre-wrap; max-height: 400px; overflow-y: auto;"></div>
+            <button onclick="copyReport()" class="btn btn-primary w-full mt-16">Kopírovat Text</button>
+        </div>
+    </div>
+
     <script>
-        const DEFAULT_RATE_EUR = 15.0;
-        const DEFAULT_GOAL_EUR = 500.0;
-        const DEFAULT_CATEGORIES = ['Design', 'Vývoj', 'Schůzky', 'Administrativa', 'Osobní'];
-        const MONTH_NAMES = [
-            'Leden',
-            'Únor',
-            'Březen',
-            'Duben',
-            'Květen',
-            'Červen',
-            'Červenec',
-            'Srpen',
-            'Září',
-            'Říjen',
-            'Listopad',
-            'Prosinec',
-        ];
-        const TASK_TYPES = {
-            maly: { name: 'Malý stůl', earnings: 30 },
-            stredni: { name: 'Střední stůl', earnings: 48 },
-            velky: { name: 'Velký stůl', earnings: 60 },
-        };
+        // PDF.js Worker Configuration
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
 
+        // State Management
         let state = {
-            timerStartTime: null,
-            entries: [],
-            settings: {
-                userRates: {},
-                monthlyGoal: DEFAULT_GOAL_EUR,
-                categories: DEFAULT_CATEGORIES,
-            },
-            entryType: 'hourly',
-            filters: {
-                type: 'all',
-                category: 'all',
-                month: new Date().getMonth() + 1,
-                year: new Date().getFullYear(),
-            },
+            projects: [],
+            workers: [],
+            workEntries: []
         };
 
-        let timerInterval = null;
+        // Canvas State
+        let canvasState = {
+            currentZoom: 1.0,
+            panOffsetX: 0,
+            panOffsetY: 0,
+            pdfRendered: false,
+            currentPDF: null,
+            currentPage: null,
+            baseScale: 1.0,
+            touchStartDistance: 0,
+            lastTouchX: 0,
+            lastTouchY: 0,
+            isDragging: false,
+            touchStartTime: 0,
+            touchMoved: false
+        };
+
+        // Timer State
+        let timerState = {
+            isRunning: false,
+            startTime: null,
+            workerId: null,
+            intervalId: null
+        };
+
+        // Initialize App
+        function initApp() {
+            loadState();
+            setupEventListeners();
+            renderProjectsDropdown();
+            renderWorkersList();
+            renderProjectsList();
+            renderRecordsList();
+            updateStatistics();
+            
+            // Set today's date for report
+            document.getElementById('reportDate').valueAsDate = new Date();
+            
+            // Navigate to settings if no projects
+            if (state.projects.length === 0) {
+                navigateTo('settings');
+            }
+
+            // Register Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register(createServiceWorkerBlob()).catch(err => {
+                    console.log('Service Worker registration failed:', err);
+                });
+            }
+        }
+
+        // Create Service Worker as Blob
+        function createServiceWorkerBlob() {
+            const swCode = `
+                const CACHE_NAME = 'solar-work-v1';
+                const urlsToCache = ['./', './index.html'];
+                
+                self.addEventListener('install', event => {
+                    event.waitUntil(
+                        caches.open(CACHE_NAME)
+                            .then(cache => cache.addAll(urlsToCache))
+                    );
+                });
+                
+                self.addEventListener('fetch', event => {
+                    event.respondWith(
+                        caches.match(event.request)
+                            .then(response => response || fetch(event.request))
+                    );
+                });
+            `;
+            const blob = new Blob([swCode], { type: 'application/javascript' });
+            return URL.createObjectURL(blob);
+        }
+
+        // State Management (In-Memory)
+        // Note: Data persists during the session but is lost on page reload
+        // This is due to sandboxed environment restrictions
+        function loadState() {
+            // State is maintained in memory during the session
+            // No persistent storage available in this environment
+        }
 
         function saveState() {
-            try {
-                const dataToSave = {
-                    entries: state.entries,
-                    settings: state.settings,
-                    timerStartTime: state.timerStartTime,
-                };
-                localStorage.setItem('worktime-tracker-data', JSON.stringify(dataToSave));
-            } catch (error) {
-                console.error('Chyba při ukládání do localStorage:', error);
+            // State is automatically maintained in the 'state' variable
+            // Changes are reflected immediately in memory
+            console.log('State updated (in-memory only)');
+        }
+
+        // Navigation
+        function navigateTo(pageName) {
+            // Hide all pages
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            // Show selected page
+            document.getElementById(`page-${pageName}`).classList.add('active');
+            
+            // Update nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.page === pageName);
+            });
+
+            // Update page-specific content
+            if (pageName === 'records') {
+                renderRecordsList();
+            } else if (pageName === 'statistics') {
+                updateStatistics();
             }
         }
 
-        function loadState() {
-            try {
-                const savedData = localStorage.getItem('worktime-tracker-data');
-                if (savedData) {
-                    const data = JSON.parse(savedData);
-                    state.entries = data.entries || [];
-                    state.settings = data.settings || {
-                        userRates: {},
-                        monthlyGoal: DEFAULT_GOAL_EUR,
-                        categories: DEFAULT_CATEGORIES,
-                    };
-                    state.timerStartTime = data.timerStartTime || null;
-                }
-            } catch (error) {
-                console.error('Chyba při načítání z localStorage:', error);
-            }
+        // Setup Event Listeners
+        function setupEventListeners() {
+            // Project Selection
+            document.getElementById('projectSelect').addEventListener('change', loadProjectPlan);
+            
+            // Canvas Touch Events
+            const canvas = document.getElementById('pdfCanvas');
+            canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+            canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+            canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+            
+            // Reset Zoom
+            document.getElementById('resetZoom').addEventListener('click', resetZoom);
+            
+            // Timer Controls
+            document.getElementById('startShift').addEventListener('click', startShift);
+            document.getElementById('stopShift').addEventListener('click', stopShift);
+            
+            // Records Filter
+            document.getElementById('recordsFilter').addEventListener('change', renderRecordsList);
+            
+            // Stats Filters
+            document.getElementById('statsWorkerFilter').addEventListener('change', updateStatistics);
+            document.getElementById('statsProjectFilter').addEventListener('change', updateStatistics);
         }
 
-        function vibrate(duration = 10) {
-            if ('vibrate' in navigator) {
-                navigator.vibrate(duration);
-            }
+        // Toast Notifications
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast toast-${type} show`;
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
         }
 
-        function switchEntryType(type) {
-            vibrate();
-            state.entryType = type;
-            const hourlyForm = document.getElementById('form-hourly');
-            const taskForm = document.getElementById('form-task');
-            const tabHourly = document.getElementById('tab-hourly');
-            const tabTask = document.getElementById('tab-task');
+        // Loader
+        function showLoader() {
+            document.getElementById('loader').classList.add('show');
+        }
 
-            tabHourly.classList.remove('tab-active');
-            tabTask.classList.remove('tab-active');
+        function hideLoader() {
+            document.getElementById('loader').classList.remove('show');
+        }
 
-            if (type === 'hourly') {
-                hourlyForm.classList.remove('hidden');
-                taskForm.classList.add('hidden');
-                tabHourly.classList.add('tab-active');
+        // Modal Functions
+        function openModal(modalId) {
+            document.getElementById(modalId).classList.add('active');
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // PROJECT MANAGEMENT
+        function openProjectModal(projectId = null) {
+            if (projectId) {
+                const project = state.projects.find(p => p.id === projectId);
+                document.getElementById('projectModalTitle').textContent = 'Upravit Projekt';
+                document.getElementById('projectId').value = project.id;
+                document.getElementById('projectName').value = project.jmenoProjektu;
+                document.getElementById('currentPDF').textContent = project.planPDF ? 'PDF nahrán' : 'Žádné PDF';
+                document.getElementById('projectPDF').required = false;
             } else {
-                hourlyForm.classList.add('hidden');
-                taskForm.classList.remove('hidden');
-                tabTask.classList.add('tab-active');
+                document.getElementById('projectModalTitle').textContent = 'Přidat Nový Projekt';
+                document.getElementById('projectForm').reset();
+                document.getElementById('currentPDF').textContent = '';
+                document.getElementById('projectPDF').required = true;
+            }
+            openModal('projectModal');
+        }
+
+        function saveProject(event) {
+            event.preventDefault();
+            const projectId = document.getElementById('projectId').value;
+            const projectName = document.getElementById('projectName').value.trim();
+            const pdfFile = document.getElementById('projectPDF').files[0];
+
+            if (projectId) {
+                // Edit existing project
+                const project = state.projects.find(p => p.id === projectId);
+                project.jmenoProjektu = projectName;
+                
+                if (pdfFile) {
+                    showLoader();
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        project.planPDF = e.target.result;
+                        saveState();
+                        renderProjectsList();
+                        renderProjectsDropdown();
+                        closeModal('projectModal');
+                        hideLoader();
+                        showToast('Projekt aktualizován', 'success');
+                    };
+                    reader.readAsDataURL(pdfFile);
+                } else {
+                    saveState();
+                    renderProjectsList();
+                    renderProjectsDropdown();
+                    closeModal('projectModal');
+                    showToast('Projekt aktualizován', 'success');
+                }
+            } else {
+                // Add new project
+                if (!pdfFile) {
+                    showToast('Prosím nahrajte PDF soubor', 'error');
+                    return;
+                }
+                
+                showLoader();
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const newProject = {
+                        id: 'proj-' + Date.now(),
+                        jmenoProjektu: projectName,
+                        planPDF: e.target.result
+                    };
+                    state.projects.push(newProject);
+                    saveState();
+                    renderProjectsList();
+                    renderProjectsDropdown();
+                    closeModal('projectModal');
+                    hideLoader();
+                    showToast('Projekt přidán', 'success');
+                };
+                reader.readAsDataURL(pdfFile);
             }
         }
 
-        function getUserRate() {
-            return state.settings.userRates['default'] || DEFAULT_RATE_EUR;
+        function deleteProject(projectId) {
+            if (confirm('Opravdu chcete smazat tento projekt? Smažou se i všechny související záznamy.')) {
+                state.projects = state.projects.filter(p => p.id !== projectId);
+                state.workEntries = state.workEntries.filter(e => e.projectId !== projectId);
+                saveState();
+                renderProjectsList();
+                renderProjectsDropdown();
+                showToast('Projekt smazán', 'success');
+            }
         }
 
-       function toggleTimer() {
-    vibrate(50);
-    const selectedCategory = document.getElementById('entry-category').value;
+        function renderProjectsList() {
+            const container = document.getElementById('projectsList');
+            if (state.projects.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="padding: 20px;">Žádné projekty</div>';
+                return;
+            }
+            
+            container.innerHTML = state.projects.map(project => `
+                <div class="list-item">
+                    <div class="list-item-info">
+                        <div class="list-item-title">${project.jmenoProjektu}</div>
+                        <div class="list-item-subtitle">${project.planPDF ? '✓ PDF nahrán' : '✗ Bez PDF'}</div>
+                    </div>
+                    <div class="flex gap-8">
+                        <button onclick="openProjectModal('${project.id}')" class="record-btn" style="background: rgba(59, 130, 246, 0.2); color: var(--color-primary);">Upravit</button>
+                        <button onclick="deleteProject('${project.id}')" class="record-btn" style="background: rgba(239, 68, 68, 0.2); color: var(--color-danger);">Smazat</button>
+                    </div>
+                </div>
+            `).join('');
+        }
 
-    // Zkontrolujeme, zda je vybrána kategorie
-    if (!selectedCategory && !state.timerStartTime) {
-        console.error("Vyberte prosím kategorii před zahájením práce.");
-        const categorySelect = document.getElementById('entry-category');
-        categorySelect.classList.add('border-red-500', 'animate-pulse');
-        setTimeout(() => categorySelect.classList.remove('border-red-500', 'animate-pulse'), 1000);
-        return;
-    }
+        function renderProjectsDropdown() {
+            const select = document.getElementById('projectSelect');
+            const statsSelect = document.getElementById('statsProjectFilter');
+            
+            const options = state.projects.map(p => 
+                `<option value="${p.id}">${p.jmenoProjektu}</option>`
+            ).join('');
+            
+            select.innerHTML = '<option value="">-- Vyberte projekt --</option>' + options;
+            statsSelect.innerHTML = '<option value="">Všechny projekty</option>' + options;
+        }
 
-    if (state.timerStartTime) {
-        // Stop the timer
-        const now = Date.now();
-        const duration = now - state.timerStartTime;
+        // WORKER MANAGEMENT
+        function openWorkerModal(workerId = null) {
+            if (workerId) {
+                const worker = state.workers.find(w => w.id === workerId);
+                document.getElementById('workerModalTitle').textContent = 'Upravit Pracovníka';
+                document.getElementById('workerId').value = worker.id;
+                document.getElementById('workerName').value = worker.name;
+                document.getElementById('workerRate').value = worker.hourlyRate;
+            } else {
+                document.getElementById('workerModalTitle').textContent = 'Přidat Nového Pracovníka';
+                document.getElementById('workerForm').reset();
+            }
+            openModal('workerModal');
+        }
 
-        // Najdeme běžící záznam podle startTime a endTime null
-        const runningEntryIndex = state.entries.findIndex(
-            (e) => e.startTime === state.timerStartTime && e.endTime === null
-        );
+        function saveWorker(event) {
+            event.preventDefault();
+            const workerId = document.getElementById('workerId').value;
+            const workerName = document.getElementById('workerName').value.trim();
+            const workerRate = parseFloat(document.getElementById('workerRate').value);
 
-        if (runningEntryIndex !== -1) {
-            state.entries[runningEntryIndex].endTime = now;
-            state.entries[runningEntryIndex].duration = duration;
-            state.entries[runningEntryIndex].timestamp = now;
-        } else {
-            // Pokud není nalezen žádný běžící záznam (zalomit by se nemělo)
-            state.entries.push({
-                id: crypto.randomUUID(),
-                type: 'hourly',
-                category: selectedCategory,
-                startTime: state.timerStartTime,
-                endTime: now,
-                duration: duration,
-                timestamp: now,
+            if (workerId) {
+                const worker = state.workers.find(w => w.id === workerId);
+                worker.name = workerName;
+                worker.hourlyRate = workerRate;
+            } else {
+                const newWorker = {
+                    id: 'worker-' + Date.now(),
+                    name: workerName,
+                    hourlyRate: workerRate
+                };
+                state.workers.push(newWorker);
+            }
+            
+            saveState();
+            renderWorkersList();
+            closeModal('workerModal');
+            showToast('Pracovník uložen', 'success');
+        }
+
+        function deleteWorker(workerId) {
+            if (confirm('Opravdu chcete smazat tohoto pracovníka?')) {
+                state.workers = state.workers.filter(w => w.id !== workerId);
+                saveState();
+                renderWorkersList();
+                showToast('Pracovník smazán', 'success');
+            }
+        }
+
+        function renderWorkersList() {
+            const container = document.getElementById('workersList');
+            const timerSelect = document.getElementById('timerWorker');
+            const taskSelect = document.getElementById('taskWorker');
+            const statsSelect = document.getElementById('statsWorkerFilter');
+            
+            if (state.workers.length === 0) {
+                container.innerHTML = '<div class="empty-state" style="padding: 20px;">Žádní pracovníci</div>';
+            } else {
+                container.innerHTML = state.workers.map(worker => `
+                    <div class="list-item">
+                        <div class="list-item-info">
+                            <div class="list-item-title">${worker.name}</div>
+                            <div class="list-item-subtitle">€${worker.hourlyRate.toFixed(2)}/hod</div>
+                        </div>
+                        <div class="flex gap-8">
+                            <button onclick="openWorkerModal('${worker.id}')" class="record-btn" style="background: rgba(59, 130, 246, 0.2); color: var(--color-primary);">Upravit</button>
+                            <button onclick="deleteWorker('${worker.id}')" class="record-btn" style="background: rgba(239, 68, 68, 0.2); color: var(--color-danger);">Smazat</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            const workerOptions = state.workers.map(w => 
+                `<option value="${w.id}">${w.name}</option>`
+            ).join('');
+            
+            timerSelect.innerHTML = '<option value="">-- Vyberte pracovníka --</option>' + workerOptions;
+            taskSelect.innerHTML = '<option value="">-- Vyberte pracovníka --</option>' + workerOptions;
+            statsSelect.innerHTML = '<option value="">Všichni pracovníci</option>' + workerOptions;
+        }
+
+        // PDF PLAN LOADING AND RENDERING
+        function loadProjectPlan() {
+            const projectId = document.getElementById('projectSelect').value;
+            
+            if (!projectId) {
+                document.getElementById('canvasWrapper').style.display = 'none';
+                document.getElementById('noPlanMessage').style.display = 'block';
+                return;
+            }
+            
+            const project = state.projects.find(p => p.id === projectId);
+            if (!project || !project.planPDF) {
+                showToast('Tento projekt nemá nahrán PDF plán', 'error');
+                return;
+            }
+            
+            document.getElementById('noPlanMessage').style.display = 'none';
+            document.getElementById('canvasWrapper').style.display = 'block';
+            
+            showLoader();
+            renderPDF(project.planPDF);
+        }
+
+        function renderPDF(pdfDataUri) {
+            // Extract base64 data
+            const base64 = pdfDataUri.split(',')[1];
+            const pdfData = atob(base64);
+            
+            // Convert to Uint8Array
+            const uint8Array = new Uint8Array(pdfData.length);
+            for (let i = 0; i < pdfData.length; i++) {
+                uint8Array[i] = pdfData.charCodeAt(i);
+            }
+            
+            const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
+            loadingTask.promise.then(pdf => {
+                canvasState.currentPDF = pdf;
+                return pdf.getPage(1);
+            }).then(page => {
+                canvasState.currentPage = page;
+                const canvas = document.getElementById('pdfCanvas');
+                const container = document.getElementById('canvasContainer');
+                const containerWidth = container.clientWidth;
+                
+                const viewport = page.getViewport({ scale: 1.0 });
+                const scale = containerWidth / viewport.width;
+                canvasState.baseScale = scale;
+                canvasState.currentZoom = 1.0;
+                canvasState.panOffsetX = 0;
+                canvasState.panOffsetY = 0;
+                
+                renderCanvasWithPins();
+                hideLoader();
+                canvasState.pdfRendered = true;
+            }).catch(error => {
+                console.error('Error loading PDF:', error);
+                showToast('Chyba při načítání PDF', 'error');
+                hideLoader();
             });
         }
 
-        state.timerStartTime = null;
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
+        function renderCanvasWithPins() {
+            if (!canvasState.currentPage) return;
+            
+            const canvas = document.getElementById('pdfCanvas');
+            const context = canvas.getContext('2d');
+            
+            const totalScale = canvasState.baseScale * canvasState.currentZoom;
+            const viewport = canvasState.currentPage.getViewport({ scale: totalScale });
+            
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            
+            canvasState.currentPage.render(renderContext).promise.then(() => {
+                drawPins(context);
+            });
         }
-    } else {
-        // Start the timer
-        state.timerStartTime = Date.now();
 
-        // Přidáme dočasný záznam běžící hodiny
-        state.entries.push({
-            id: crypto.randomUUID(),
-            type: 'hourly',
-            category: selectedCategory,
-            startTime: state.timerStartTime,
-            endTime: null,
-            duration: 0,
-            timestamp: state.timerStartTime,
-        });
+        function drawPins(context) {
+            const projectId = document.getElementById('projectSelect').value;
+            if (!projectId) return;
+            
+            const entries = state.workEntries.filter(e => e.type === 'task' && e.projectId === projectId);
+            
+            entries.forEach((entry, index) => {
+                const x = entry.x * canvasState.baseScale * canvasState.currentZoom + canvasState.panOffsetX;
+                const y = entry.y * canvasState.baseScale * canvasState.currentZoom + canvasState.panOffsetY;
+                
+                // Draw pin circle
+                context.beginPath();
+                context.arc(x, y, 12, 0, 2 * Math.PI);
+                context.fillStyle = '#4ade80';
+                context.fill();
+                context.strokeStyle = '#fff';
+                context.lineWidth = 2;
+                context.stroke();
+                
+                // Draw table number
+                context.fillStyle = '#fff';
+                context.font = 'bold 10px sans-serif';
+                context.textAlign = 'center';
+                context.fillText(entry.tableNumber, x, y + 25);
+            });
+        }
 
-        startTimerDisplay();
-    }
-    saveState();
-    renderUI();
-}
+        function resetZoom() {
+            canvasState.currentZoom = 1.0;
+            canvasState.panOffsetX = 0;
+            canvasState.panOffsetY = 0;
+            renderCanvasWithPins();
+        }
 
-// Funkce pro spuštění a aktualizaci časovače na UI
-function startTimerDisplay() {
-    if (timerInterval) clearInterval(timerInterval);
-    if (!state.timerStartTime) {
-        updateTimerDisplay(0);
-        return;
-    }
-    timerInterval = setInterval(() => {
-        const elapsed = Date.now() - state.timerStartTime;
-        updateTimerDisplay(elapsed);
-    }, 1000);
-}
+        // CANVAS TOUCH INTERACTIONS
+        function handleTouchStart(e) {
+            e.preventDefault();
+            canvasState.touchStartTime = Date.now();
+            canvasState.touchMoved = false;
+            
+            if (e.touches.length === 1) {
+                canvasState.lastTouchX = e.touches[0].clientX;
+                canvasState.lastTouchY = e.touches[0].clientY;
+                canvasState.isDragging = true;
+            } else if (e.touches.length === 2) {
+                canvasState.isDragging = false;
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                canvasState.touchStartDistance = Math.sqrt(dx * dx + dy * dy);
+            }
+        }
 
-function updateTimerDisplay(ms) {
-    const display = document.getElementById('timer-display');
-    display.textContent = formatDuration(ms);
-    const status = document.getElementById('timer-status').children[0];
-    const startStopBtn = document.getElementById('start-stop-button');
-    if (state.timerStartTime) {
-        status.textContent = 'RUN';
-        status.classList.remove('text-yellow-400');
-        status.classList.add('text-green-400');
-        startStopBtn.textContent = 'ZASTAVIT PRÁCI';
-    } else {
-        status.textContent = 'STOP';
-        status.classList.remove('text-green-400');
-        status.classList.add('text-yellow-400');
-        startStopBtn.textContent = 'ZAHÁJIT PRÁCI';
-    }
-}
+        function handleTouchMove(e) {
+            e.preventDefault();
+            canvasState.touchMoved = true;
+            
+            if (e.touches.length === 1 && canvasState.isDragging) {
+                const deltaX = e.touches[0].clientX - canvasState.lastTouchX;
+                const deltaY = e.touches[0].clientY - canvasState.lastTouchY;
+                
+                canvasState.panOffsetX += deltaX;
+                canvasState.panOffsetY += deltaY;
+                
+                canvasState.lastTouchX = e.touches[0].clientX;
+                canvasState.lastTouchY = e.touches[0].clientY;
+                
+                renderCanvasWithPins();
+            } else if (e.touches.length === 2) {
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                const scale = distance / canvasState.touchStartDistance;
+                canvasState.currentZoom = Math.max(0.5, Math.min(3.0, canvasState.currentZoom * scale));
+                canvasState.touchStartDistance = distance;
+                
+                renderCanvasWithPins();
+            }
+        }
 
-function formatDuration(ms) {
-    const totalSeconds = Math.floor(ms / 1000);
-    const hours = Math.floor(totalSeconds / 3600)
-        .toString()
-        .padStart(2, '0');
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-        .toString()
-        .padStart(2, '0');
-    const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${hours}:${minutes}:${seconds}`;
-}
+        function handleTouchEnd(e) {
+            e.preventDefault();
+            
+            const touchDuration = Date.now() - canvasState.touchStartTime;
+            
+            // Detect tap (short touch without movement)
+            if (touchDuration < 300 && !canvasState.touchMoved && e.changedTouches.length === 1) {
+                const rect = e.target.getBoundingClientRect();
+                const x = e.changedTouches[0].clientX - rect.left;
+                const y = e.changedTouches[0].clientY - rect.top;
+                
+                // Convert screen coordinates to PDF coordinates
+                const pdfX = (x - canvasState.panOffsetX) / (canvasState.baseScale * canvasState.currentZoom);
+                const pdfY = (y - canvasState.panOffsetY) / (canvasState.baseScale * canvasState.currentZoom);
+                
+                openTaskModal(pdfX, pdfY);
+            }
+            
+            canvasState.isDragging = false;
+        }
 
-// Další potřebné funkce (renderUI, uložit úkol, správa kategorií aj.) by následovaly zde
+        // TASK MODAL (Add Pin)
+        function openTaskModal(x, y) {
+            if (state.workers.length === 0) {
+                showToast('Nejprve přidejte pracovníky v Nastavení', 'error');
+                return;
+            }
+            
+            document.getElementById('taskX').value = x;
+            document.getElementById('taskY').value = y;
+            document.getElementById('taskForm').reset();
+            document.getElementById('taskX').value = x;
+            document.getElementById('taskY').value = y;
+            openModal('taskModal');
+        }
 
-// Počáteční inicializace
-window.onload = () => {
-    loadState();
-    initUI();
-    renderUI();
-    if(state.timerStartTime) startTimerDisplay();
-};
+        function saveTask(event) {
+            event.preventDefault();
+            const projectId = document.getElementById('projectSelect').value;
+            const workerId = document.getElementById('taskWorker').value;
+            const tableNumber = document.getElementById('taskTableNumber').value.trim();
+            const reward = parseFloat(document.getElementById('taskReward').value);
+            const x = parseFloat(document.getElementById('taskX').value);
+            const y = parseFloat(document.getElementById('taskY').value);
+            
+            const newEntry = {
+                id: 'entry-' + Date.now(),
+                type: 'task',
+                projectId: projectId,
+                workerId: workerId,
+                tableNumber: tableNumber,
+                reward: reward,
+                x: x,
+                y: y,
+                timestamp: Date.now()
+            };
+            
+            state.workEntries.push(newEntry);
+            saveState();
+            renderCanvasWithPins();
+            closeModal('taskModal');
+            showToast('Stůl přidán', 'success');
+        }
 
-// Inicializace UI elementů jako selecty měsíců, roků, kategorií
-function initUI() {
-    // Naplnění výběru měsíců
-    const filterMonth = document.getElementById('filter-month');
-    MONTH_NAMES.forEach((monthName, i) => {
-        const option = document.createElement('option');
-        option.value = i + 1;
-        option.textContent = monthName;
-        filterMonth.appendChild(option);
-    });
-    filterMonth.value = state.filters.month;
+        // TIMER FUNCTIONS
+        function startShift() {
+            const workerId = document.getElementById('timerWorker').value;
+            if (!workerId) {
+                showToast('Vyberte pracovníka', 'error');
+                return;
+            }
+            
+            timerState.isRunning = true;
+            timerState.startTime = Date.now();
+            timerState.workerId = workerId;
+            
+            document.getElementById('startShift').style.display = 'none';
+            document.getElementById('stopShift').style.display = 'block';
+            document.getElementById('timerWorker').disabled = true;
+            
+            timerState.intervalId = setInterval(updateTimerDisplay, 1000);
+            showToast('Směna zahájena', 'success');
+        }
 
-    // Naplnění výběru roků (např. posledních 5 let)
-    const filterYear = document.getElementById('filter-year');
-    const currentYear = new Date().getFullYear();
-    for (let y = currentYear; y >= currentYear - 5; y--) {
-        const option = document.createElement('option');
-        option.value = y;
-        option.textContent = y;
-        filterYear.appendChild(option);
-    }
-    filterYear.value = state.filters.year;
+        function stopShift() {
+            if (!timerState.isRunning) return;
+            
+            const endTime = Date.now();
+            const totalMs = endTime - timerState.startTime;
+            const totalHours = totalMs / (1000 * 60 * 60);
+            
+            const worker = state.workers.find(w => w.id === timerState.workerId);
+            const totalEarned = totalHours * worker.hourlyRate;
+            
+            const newEntry = {
+                id: 'entry-' + Date.now(),
+                type: 'hourly',
+                workerId: timerState.workerId,
+                startTime: timerState.startTime,
+                endTime: endTime,
+                totalHours: totalHours,
+                totalEarned: totalEarned
+            };
+            
+            state.workEntries.push(newEntry);
+            saveState();
+            
+            clearInterval(timerState.intervalId);
+            timerState.isRunning = false;
+            timerState.startTime = null;
+            timerState.workerId = null;
+            
+            document.getElementById('startShift').style.display = 'block';
+            document.getElementById('stopShift').style.display = 'none';
+            document.getElementById('timerWorker').disabled = false;
+            document.getElementById('timerDisplay').textContent = '00:00:00';
+            
+            showToast(`Směna ukončena: ${totalHours.toFixed(2)}h, €${totalEarned.toFixed(2)}`, 'success');
+            renderRecordsList();
+        }
 
-    // Naplnění kategorií
-    renderCategoryOptions();
-}
+        function updateTimerDisplay() {
+            if (!timerState.isRunning) return;
+            
+            const elapsed = Date.now() - timerState.startTime;
+            const hours = Math.floor(elapsed / (1000 * 60 * 60));
+            const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((elapsed % (1000 * 60)) / 1000);
+            
+            document.getElementById('timerDisplay').textContent = 
+                `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
 
-// Nastavení kategorií v selectu
-function renderCategoryOptions() {
-    const categorySelects = [
-        document.getElementById('entry-category'),
-        document.getElementById('filter-category'),
-        document.getElementById('edit-category'),
-    ];
-    categorySelects.forEach((select) => {
-        select.innerHTML = '<option value="all">Vše</option>';
-        state.settings.categories.forEach((cat) => {
-            const option = document.createElement('option');
-            option.value = cat;
-            option.textContent = cat;
-            select.appendChild(option);
-        });
-    });
-    document.getElementById('filter-category').value = state.filters.category;
-}
+        // RECORDS LIST
+        function renderRecordsList() {
+            const container = document.getElementById('recordsList');
+            const filter = document.getElementById('recordsFilter').value;
+            
+            let entries = state.workEntries;
+            if (filter !== 'all') {
+                entries = entries.filter(e => e.type === filter);
+            }
+            
+            entries.sort((a, b) => b.timestamp - a.timestamp || b.endTime - a.endTime);
+            
+            if (entries.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📝</div><div>Žádné záznamy</div></div>';
+                return;
+            }
+            
+            container.innerHTML = entries.map(entry => {
+                const worker = state.workers.find(w => w.id === entry.workerId);
+                const workerName = worker ? worker.name : 'Neznámý';
+                
+                if (entry.type === 'task') {
+                    const project = state.projects.find(p => p.id === entry.projectId);
+                    const projectName = project ? project.jmenoProjektu : 'Neznámý projekt';
+                    const date = new Date(entry.timestamp);
+                    
+                    return `
+                        <div class="record-item">
+                            <div class="record-header">
+                                <span class="record-type record-type-task">Stůl</span>
+                                <div class="record-actions">
+                                    <button onclick="deleteEntry('${entry.id}')" class="record-btn btn-danger" style="background: rgba(239, 68, 68, 0.2); color: var(--color-danger);">Smazat</button>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 8px;"><strong>${entry.tableNumber}</strong></div>
+                            <div style="font-size: 14px; color: var(--color-text-secondary);">
+                                <div>👷 ${workerName}</div>
+                                <div>📋 ${projectName}</div>
+                                <div>💰 €${entry.reward.toFixed(2)}</div>
+                                <div>📅 ${date.toLocaleDateString('cs-CZ')} ${date.toLocaleTimeString('cs-CZ')}</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    const startDate = new Date(entry.startTime);
+                    const endDate = new Date(entry.endTime);
+                    
+                    return `
+                        <div class="record-item">
+                            <div class="record-header">
+                                <span class="record-type record-type-hourly">Hodiny</span>
+                                <div class="record-actions">
+                                    <button onclick="deleteEntry('${entry.id}')" class="record-btn btn-danger" style="background: rgba(239, 68, 68, 0.2); color: var(--color-danger);">Smazat</button>
+                                </div>
+                            </div>
+                            <div style="margin-bottom: 8px;"><strong>${workerName}</strong></div>
+                            <div style="font-size: 14px; color: var(--color-text-secondary);">
+                                <div>⏱️ ${entry.totalHours.toFixed(2)} hodin</div>
+                                <div>💰 €${entry.totalEarned.toFixed(2)}</div>
+                                <div>📅 ${startDate.toLocaleDateString('cs-CZ')} ${startDate.toLocaleTimeString('cs-CZ')}</div>
+                                <div>→ ${endDate.toLocaleTimeString('cs-CZ')}</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
 
-// Render UI, seznam záznamů, přehledy atd.
-// Funkce renderUI, updateFilters, saveRate, saveGoal, saveTaskEntry, deleteEntry atd. ještě doplnit...
+        function deleteEntry(entryId) {
+            if (confirm('Opravdu chcete smazat tento záznam?')) {
+                state.workEntries = state.workEntries.filter(e => e.id !== entryId);
+                saveState();
+                renderRecordsList();
+                renderCanvasWithPins();
+                updateStatistics();
+                showToast('Záznam smazán', 'success');
+            }
+        }
 
+        // STATISTICS
+        function updateStatistics() {
+            const workerFilter = document.getElementById('statsWorkerFilter').value;
+            const projectFilter = document.getElementById('statsProjectFilter').value;
+            
+            let entries = state.workEntries;
+            
+            if (workerFilter) {
+                entries = entries.filter(e => e.workerId === workerFilter);
+            }
+            if (projectFilter) {
+                entries = entries.filter(e => e.projectId === projectFilter);
+            }
+            
+            const taskEntries = entries.filter(e => e.type === 'task');
+            const hourlyEntries = entries.filter(e => e.type === 'hourly');
+            
+            const totalTaskEarnings = taskEntries.reduce((sum, e) => sum + e.reward, 0);
+            const totalHourlyEarnings = hourlyEntries.reduce((sum, e) => sum + e.totalEarned, 0);
+            const totalEarnings = totalTaskEarnings + totalHourlyEarnings;
+            
+            const totalHours = hourlyEntries.reduce((sum, e) => sum + e.totalHours, 0);
+            const totalTables = taskEntries.length;
+            const avgReward = totalTables > 0 ? totalTaskEarnings / totalTables : 0;
+            
+            document.getElementById('statTotalEarnings').textContent = `€${totalEarnings.toFixed(2)}`;
+            document.getElementById('statTotalHours').textContent = `${totalHours.toFixed(1)}h`;
+            document.getElementById('statTotalTables').textContent = totalTables;
+            document.getElementById('statAvgReward').textContent = `€${avgReward.toFixed(2)}`;
+            
+            // Worker earnings breakdown
+            const workerEarnings = {};
+            entries.forEach(entry => {
+                const worker = state.workers.find(w => w.id === entry.workerId);
+                const workerName = worker ? worker.name : 'Neznámý';
+                
+                if (!workerEarnings[workerName]) {
+                    workerEarnings[workerName] = 0;
+                }
+                
+                if (entry.type === 'task') {
+                    workerEarnings[workerName] += entry.reward;
+                } else {
+                    workerEarnings[workerName] += entry.totalEarned;
+                }
+            });
+            
+            const workerChart = document.getElementById('workerEarningsChart');
+            if (Object.keys(workerEarnings).length > 0) {
+                workerChart.innerHTML = Object.entries(workerEarnings)
+                    .sort((a, b) => b[1] - a[1])
+                    .map(([name, amount]) => `
+                        <div style="margin-bottom: 12px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                <span>${name}</span>
+                                <span style="font-weight: 600;">€${amount.toFixed(2)}</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); height: 8px; border-radius: 4px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #3b82f6, #8b5cf6); height: 100%; width: ${(amount / totalEarnings * 100).toFixed(1)}%;"></div>
+                            </div>
+                        </div>
+                    `).join('');
+            } else {
+                workerChart.innerHTML = '<div>Žádná data k zobrazení</div>';
+            }
+            
+            // Task vs Hourly breakdown
+            const taskVsHourlyChart = document.getElementById('taskVsHourlyChart');
+            if (totalEarnings > 0) {
+                const taskPercent = (totalTaskEarnings / totalEarnings * 100).toFixed(1);
+                const hourlyPercent = (totalHourlyEarnings / totalEarnings * 100).toFixed(1);
+                
+                taskVsHourlyChart.innerHTML = `
+                    <div style="width: 100%;">
+                        <div style="margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                <span>Stoly</span>
+                                <span style="font-weight: 600;">€${totalTaskEarnings.toFixed(2)} (${taskPercent}%)</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); height: 12px; border-radius: 6px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #4ade80, #22c55e); height: 100%; width: ${taskPercent}%;"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                <span>Hodiny</span>
+                                <span style="font-weight: 600;">€${totalHourlyEarnings.toFixed(2)} (${hourlyPercent}%)</span>
+                            </div>
+                            <div style="background: rgba(255,255,255,0.1); height: 12px; border-radius: 6px; overflow: hidden;">
+                                <div style="background: linear-gradient(90deg, #3b82f6, #2563eb); height: 100%; width: ${hourlyPercent}%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                taskVsHourlyChart.innerHTML = '<div>Žádná data k zobrazení</div>';
+            }
+        }
+
+        // DAILY REPORT
+        function generateDailyReport() {
+            const dateInput = document.getElementById('reportDate').value;
+            if (!dateInput) {
+                showToast('Vyberte datum', 'error');
+                return;
+            }
+            
+            const selectedDate = new Date(dateInput);
+            selectedDate.setHours(0, 0, 0, 0);
+            const nextDate = new Date(selectedDate);
+            nextDate.setDate(nextDate.getDate() + 1);
+            
+            const entries = state.workEntries.filter(entry => {
+                const entryDate = new Date(entry.timestamp || entry.startTime);
+                return entryDate >= selectedDate && entryDate < nextDate;
+            });
+            
+            if (entries.length === 0) {
+                showToast('Žádné záznamy pro vybrané datum', 'info');
+                return;
+            }
+            
+            let report = `DENNÍ REPORT - ${selectedDate.toLocaleDateString('cs-CZ')}\n`;
+            report += `${'='.repeat(50)}\n\n`;
+            
+            const workerGroups = {};
+            entries.forEach(entry => {
+                const worker = state.workers.find(w => w.id === entry.workerId);
+                const workerName = worker ? worker.name : 'Neznámý';
+                
+                if (!workerGroups[workerName]) {
+                    workerGroups[workerName] = { tasks: [], hourly: [] };
+                }
+                
+                if (entry.type === 'task') {
+                    workerGroups[workerName].tasks.push(entry);
+                } else {
+                    workerGroups[workerName].hourly.push(entry);
+                }
+            });
+            
+            Object.entries(workerGroups).forEach(([workerName, data]) => {
+                report += `PRACOVNÍK: ${workerName}\n`;
+                report += `-`.repeat(50) + `\n`;
+                
+                if (data.tasks.length > 0) {
+                    report += `\nHotové Stoly:\n`;
+                    data.tasks.forEach(task => {
+                        const project = state.projects.find(p => p.id === task.projectId);
+                        report += `  • ${task.tableNumber} - €${task.reward.toFixed(2)} (${project ? project.jmenoProjektu : 'N/A'})\n`;
+                    });
+                    const taskTotal = data.tasks.reduce((sum, t) => sum + t.reward, 0);
+                    report += `  Celkem ze stolů: €${taskTotal.toFixed(2)}\n`;
+                }
+                
+                if (data.hourly.length > 0) {
+                    report += `\nOdpracované Hodiny:\n`;
+                    data.hourly.forEach(h => {
+                        report += `  • ${h.totalHours.toFixed(2)}h - €${h.totalEarned.toFixed(2)}\n`;
+                    });
+                    const hourlyTotal = data.hourly.reduce((sum, h) => sum + h.totalEarned, 0);
+                    report += `  Celkem z hodin: €${hourlyTotal.toFixed(2)}\n`;
+                }
+                
+                const workerTotal = 
+                    data.tasks.reduce((sum, t) => sum + t.reward, 0) +
+                    data.hourly.reduce((sum, h) => sum + h.totalEarned, 0);
+                report += `\n  CELKEM: €${workerTotal.toFixed(2)}\n\n`;
+            });
+            
+            const grandTotal = entries.reduce((sum, e) => {
+                return sum + (e.type === 'task' ? e.reward : e.totalEarned);
+            }, 0);
+            
+            report += `${'='.repeat(50)}\n`;
+            report += `CELKOVÝ SOUČET: €${grandTotal.toFixed(2)}\n`;
+            
+            document.getElementById('reportContent').textContent = report;
+            openModal('reportModal');
+        }
+
+        function copyReport() {
+            const reportText = document.getElementById('reportContent').textContent;
+            navigator.clipboard.writeText(reportText).then(() => {
+                showToast('Report zkopírován do schránky', 'success');
+            }).catch(() => {
+                showToast('Chyba při kopírování', 'error');
+            });
+        }
+
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', initApp);
+
+        // PWA Manifest inline
+        const manifestData = {
+            name: "Solar Work Count Lithuania by Marty Party",
+            short_name: "Solar Work",
+            description: "Solar panel installation work tracking application",
+            start_url: "./",
+            display: "standalone",
+            background_color: "#0f172a",
+            theme_color: "#1e293b",
+            icons: [
+                {
+                    src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%231e293b'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-size='256' fill='%233b82f6'%3E☀️%3C/text%3E%3C/svg%3E",
+                    sizes: "512x512",
+                    type: "image/svg+xml"
+                }
+            ]
+        };
+
+        const manifestBlob = new Blob([JSON.stringify(manifestData)], { type: 'application/json' });
+        const manifestURL = URL.createObjectURL(manifestBlob);
+        document.getElementById('manifest-placeholder').setAttribute('href', manifestURL);
+    </script>
+</body>
+</html>
